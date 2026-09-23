@@ -1,0 +1,153 @@
+export type User = { id: string; email: string };
+
+export type Target = {
+  id: string;
+  app_id: string;
+  host: string;
+  status: "pending" | "verified" | "disabled";
+  verify_token: string;
+  verify_method: string | null;
+  trusted_private: boolean;
+  created_at: string;
+  verified_at: string | null;
+};
+
+export type AppItem = {
+  id: string;
+  name: string;
+  environment: string;
+  base_url: string;
+  heartbeat_enabled: boolean;
+  tls_enabled: boolean;
+  http_enabled: boolean;
+  safe_enabled: boolean;
+  last_status_code: number | null;
+  last_latency_ms: number | null;
+  last_title: string | null;
+  last_up: boolean | null;
+  last_checked_at: string | null;
+  created_at: string;
+  targets: Target[];
+};
+
+export type Run = {
+  id: string;
+  app_id: string;
+  profile: "heartbeat" | "tls" | "http" | "safe";
+  status: "queued" | "running" | "done" | "failed";
+  error: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+};
+
+export type Finding = {
+  id: string;
+  app_id: string;
+  target_id: string | null;
+  source: string;
+  severity: "info" | "low" | "medium" | "high" | "critical";
+  title: string;
+  detail: string | null;
+  fingerprint: string;
+  status: "open" | "accepted" | "fixed";
+  first_seen_at: string;
+  last_seen_at: string;
+  closed_at: string | null;
+};
+
+export type Overview = {
+  apps: Array<{
+    id: string;
+    name: string;
+    environment: string;
+    last_up: boolean | null;
+    last_status_code: number | null;
+    last_latency_ms: number | null;
+    last_checked_at: string | null;
+    open_findings: number;
+  }>;
+  open_by_severity: Record<string, number>;
+  certs_expiring_soon: number;
+  running_scans: number;
+};
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    ...init,
+  });
+  if (res.status === 204) {
+    return undefined as T;
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const data = await res.json();
+      detail = data.detail || JSON.stringify(data);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  me: () => request<User>("/api/auth/me"),
+  login: (email: string, password: string) =>
+    request<User>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+  overview: () => request<Overview>("/api/overview"),
+  apps: () => request<AppItem[]>("/api/apps"),
+  app: (id: string) => request<AppItem>(`/api/apps/${id}`),
+  createApp: (body: {
+    name: string;
+    environment: string;
+    base_url: string;
+  }) =>
+    request<AppItem>("/api/apps", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteApp: (id: string) => request<void>(`/api/apps/${id}`, { method: "DELETE" }),
+  addTarget: (appId: string, host: string) =>
+    request<Target>(`/api/apps/${appId}/targets`, {
+      method: "POST",
+      body: JSON.stringify({ host }),
+    }),
+  verifyTarget: (id: string) =>
+    request<Target>(`/api/targets/${id}/verify`, { method: "POST" }),
+  trustPrivate: (id: string) =>
+    request<Target>(`/api/targets/${id}/trust-private`, {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+    }),
+  runs: (appId?: string) =>
+    request<Run[]>(appId ? `/api/runs?app_id=${appId}` : "/api/runs"),
+  run: (id: string) => request<Run>(`/api/runs/${id}`),
+  createRun: (appId: string, profile: Run["profile"]) =>
+    request<Run>(`/api/apps/${appId}/runs`, {
+      method: "POST",
+      body: JSON.stringify({ profile }),
+    }),
+  findings: (params?: { status?: string; app_id?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status_filter", params.status);
+    if (params?.app_id) q.set("app_id", params.app_id);
+    const qs = q.toString();
+    return request<Finding[]>(`/api/findings${qs ? `?${qs}` : ""}`);
+  },
+  updateFinding: (id: string, status: Finding["status"]) =>
+    request<Finding>(`/api/findings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+};
