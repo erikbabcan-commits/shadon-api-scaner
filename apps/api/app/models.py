@@ -33,6 +33,12 @@ class ScanProfile(str, enum.Enum):
     tls = "tls"
     http = "http"
     safe = "safe"
+    internetdb = "internetdb"
+    subdomain = "subdomain"
+    ports = "ports"
+    trivy_fs = "trivy_fs"
+    trivy_image = "trivy_image"
+    gitleaks = "gitleaks"
 
 
 class RunStatus(str, enum.Enum):
@@ -56,6 +62,10 @@ class FindingSource(str, enum.Enum):
     httpx = "httpx"
     nuclei = "nuclei"
     internetdb = "internetdb"
+    subdomain = "subdomain"
+    naabu = "naabu"
+    trivy = "trivy"
+    gitleaks = "gitleaks"
 
 
 class FindingStatus(str, enum.Enum):
@@ -84,6 +94,13 @@ class App(Base):
     tls_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     http_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     safe_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    internetdb_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    subdomain_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    ports_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    trivy_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    gitleaks_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    git_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
     last_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -119,8 +136,8 @@ class ScanRun(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     app_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("apps.id", ondelete="CASCADE"), index=True)
-    profile: Mapped[ScanProfile] = mapped_column(Enum(ScanProfile, native_enum=False))
-    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus, native_enum=False), default=RunStatus.queued)
+    profile: Mapped[ScanProfile] = mapped_column(Enum(ScanProfile, native_enum=False, length=32))
+    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus, native_enum=False, length=16), default=RunStatus.queued)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -139,9 +156,9 @@ class Finding(Base):
     target_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("targets.id", ondelete="SET NULL"), nullable=True
     )
-    source: Mapped[FindingSource] = mapped_column(Enum(FindingSource, native_enum=False))
+    source: Mapped[FindingSource] = mapped_column(Enum(FindingSource, native_enum=False, length=32))
     severity: Mapped[FindingSeverity] = mapped_column(
-        Enum(FindingSeverity, native_enum=False), default=FindingSeverity.info
+        Enum(FindingSeverity, native_enum=False, length=16), default=FindingSeverity.info
     )
     title: Mapped[str] = mapped_column(String(500))
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)

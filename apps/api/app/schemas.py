@@ -43,6 +43,13 @@ class AppCreate(BaseModel):
     tls_enabled: bool = True
     http_enabled: bool = True
     safe_enabled: bool = True
+    internetdb_enabled: bool = True
+    subdomain_enabled: bool = True
+    ports_enabled: bool = True
+    trivy_enabled: bool = True
+    gitleaks_enabled: bool = True
+    git_url: str | None = Field(default=None, max_length=500)
+    image_ref: str | None = Field(default=None, max_length=500)
 
 
 class AppUpdate(BaseModel):
@@ -53,6 +60,13 @@ class AppUpdate(BaseModel):
     tls_enabled: bool | None = None
     http_enabled: bool | None = None
     safe_enabled: bool | None = None
+    internetdb_enabled: bool | None = None
+    subdomain_enabled: bool | None = None
+    ports_enabled: bool | None = None
+    trivy_enabled: bool | None = None
+    gitleaks_enabled: bool | None = None
+    git_url: str | None = Field(default=None, max_length=500)
+    image_ref: str | None = Field(default=None, max_length=500)
 
 
 class TargetCreate(BaseModel):
@@ -82,6 +96,13 @@ class AppOut(BaseModel):
     tls_enabled: bool
     http_enabled: bool
     safe_enabled: bool
+    internetdb_enabled: bool
+    subdomain_enabled: bool
+    ports_enabled: bool
+    trivy_enabled: bool
+    gitleaks_enabled: bool
+    git_url: str | None
+    image_ref: str | None
     last_status_code: int | None
     last_latency_ms: float | None
     last_title: str | None

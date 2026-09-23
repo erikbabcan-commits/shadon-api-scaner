@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,11 +20,37 @@ from app.models import (
     RunStatus,
     ScanProfile,
     ScanRun,
+    Target,
     TargetStatus,
 )
 from app.services.findings import make_fingerprint, mark_absent_fixed, upsert_finding
+from app.services.internetdb import fetch_internetdb, resolve_public_ips
 from app.services.ntfy import send_ntfy
-from app.services.scanners import run_heartbeat, run_httpx_probe, run_nuclei_safe, run_tlsx
+from app.services.scanners import (
+    git_clone,
+    run_gitleaks,
+    run_heartbeat,
+    run_httpx_probe,
+    run_naabu,
+    run_nuclei_safe,
+    run_subfinder,
+    run_tlsx,
+    run_trivy_fs,
+    run_trivy_image,
+)
+from app.services.verify import extract_hostname
+
+
+HEAVY_PROFILES = {
+    ScanProfile.tls,
+    ScanProfile.http,
+    ScanProfile.safe,
+    ScanProfile.subdomain,
+    ScanProfile.ports,
+    ScanProfile.trivy_fs,
+    ScanProfile.trivy_image,
+    ScanProfile.gitleaks,
+}
 
 
 def _severity(value: str) -> FindingSeverity:
@@ -69,7 +97,7 @@ async def execute_scan_run(ctx, run_id: str) -> None:
             await db.commit()
             return
 
-        heavy = profile in (ScanProfile.tls, ScanProfile.http, ScanProfile.safe)
+        heavy = profile in HEAVY_PROFILES
         lock_token = None
         if heavy:
             lock_token = await redis.set(
@@ -95,6 +123,22 @@ async def execute_scan_run(ctx, run_id: str) -> None:
                 await _http(db, app, verified)
             elif profile == ScanProfile.safe:
                 await _nuclei(db, app, verified)
+            elif profile == ScanProfile.internetdb:
+                await _internetdb(db, app, verified, redis)
+            elif profile == ScanProfile.subdomain:
+                await _subdomain(db, app, verified)
+            elif profile == ScanProfile.ports:
+                await _ports(db, app, verified, settings.naabu_ports)
+            elif profile == ScanProfile.trivy_fs:
+                await _trivy_fs(db, app)
+            elif profile == ScanProfile.trivy_image:
+                await _trivy_image(db, app)
+            elif profile == ScanProfile.gitleaks:
+                await _gitleaks(db, app)
+            else:
+                await _set_run(db, rid, RunStatus.failed, f"unknown profile {profile}")
+                await db.commit()
+                return
             await _set_run(db, rid, RunStatus.done)
             await db.commit()
         except Exception as exc:  # noqa: BLE001
@@ -150,11 +194,7 @@ async def _heartbeat(db, app: App) -> None:
 async def _tls(db, app: App, targets) -> None:
     seen: set[str] = set()
     for target in targets:
-        host = target.host
-        if "://" in host:
-            from urllib.parse import urlparse
-
-            host = urlparse(host).hostname or host
+        host = extract_hostname(target.host)
         for item in await run_tlsx(host):
             fp = make_fingerprint(item.fingerprint_key)
             seen.add(fp)
@@ -229,6 +269,178 @@ async def _nuclei(db, app: App, targets) -> None:
     await mark_absent_fixed(db, app_id=app.id, source=FindingSource.nuclei, seen_fingerprints=seen)
 
 
+async def _internetdb(db, app: App, targets, redis) -> None:
+    settings = get_settings()
+    seen: set[str] = set()
+    for target in targets:
+        ips = resolve_public_ips(target.host)
+        if not ips:
+            continue
+        for ip in ips:
+            for item in await fetch_internetdb(ip, settings=settings, redis=redis):
+                fp = make_fingerprint(item.fingerprint_key)
+                seen.add(fp)
+                await upsert_finding(
+                    db,
+                    app_id=app.id,
+                    target_id=target.id,
+                    source=FindingSource.internetdb,
+                    severity=_severity(item.severity),
+                    title=item.title,
+                    detail=item.detail,
+                    fingerprint=fp,
+                    notify=True,
+                )
+    await mark_absent_fixed(
+        db, app_id=app.id, source=FindingSource.internetdb, seen_fingerprints=seen
+    )
+
+
+async def _subdomain(db, app: App, targets) -> None:
+    seen: set[str] = set()
+    existing_hosts = {extract_hostname(t.host).lower() for t in app.targets}
+    for target in targets:
+        domain = extract_hostname(target.host)
+        # skip bare IPs
+        try:
+            import ipaddress
+
+            ipaddress.ip_address(domain)
+            continue
+        except ValueError:
+            pass
+        for host in await run_subfinder(domain):
+            host = host.lower().rstrip(".")
+            if host in existing_hosts:
+                continue
+            existing_hosts.add(host)
+            db.add(
+                Target(
+                    app_id=app.id,
+                    host=host,
+                    verify_token=secrets.token_urlsafe(24),
+                    status=TargetStatus.pending,
+                )
+            )
+            fp = make_fingerprint("subdomain-candidate", str(app.id), host)
+            seen.add(fp)
+            await upsert_finding(
+                db,
+                app_id=app.id,
+                target_id=target.id,
+                source=FindingSource.subdomain,
+                severity=FindingSeverity.info,
+                title=f"New subdomain candidate: {host}",
+                detail="Pending ownership verify before scans",
+                fingerprint=fp,
+                notify=False,
+            )
+    await db.flush()
+    await mark_absent_fixed(
+        db, app_id=app.id, source=FindingSource.subdomain, seen_fingerprints=seen
+    )
+
+
+async def _ports(db, app: App, targets, ports: str) -> None:
+    seen: set[str] = set()
+    for target in targets:
+        host = extract_hostname(target.host)
+        for item in await run_naabu(host, ports):
+            fp = make_fingerprint(item.fingerprint_key)
+            seen.add(fp)
+            await upsert_finding(
+                db,
+                app_id=app.id,
+                target_id=target.id,
+                source=FindingSource.naabu,
+                severity=_severity(item.severity),
+                title=item.title,
+                detail=item.detail,
+                fingerprint=fp,
+                notify=False,
+            )
+    await mark_absent_fixed(db, app_id=app.id, source=FindingSource.naabu, seen_fingerprints=seen)
+
+
+async def _trivy_fs(db, app: App) -> None:
+    if not app.git_url:
+        raise RuntimeError("git_url not set on app")
+    work = Path(f"/tmp/straz-git/{app.id}")
+    ok, err = await git_clone(app.git_url, work)
+    if not ok:
+        raise RuntimeError(err)
+    seen: set[str] = set()
+    try:
+        for item in await run_trivy_fs(work):
+            fp = make_fingerprint(item.fingerprint_key)
+            seen.add(fp)
+            await upsert_finding(
+                db,
+                app_id=app.id,
+                target_id=None,
+                source=FindingSource.trivy,
+                severity=_severity(item.severity),
+                title=item.title,
+                detail=item.detail,
+                fingerprint=fp,
+                notify=True,
+            )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    await mark_absent_fixed(db, app_id=app.id, source=FindingSource.trivy, seen_fingerprints=seen)
+
+
+async def _trivy_image(db, app: App) -> None:
+    if not app.image_ref:
+        raise RuntimeError("image_ref not set on app")
+    seen: set[str] = set()
+    for item in await run_trivy_image(app.image_ref):
+        fp = make_fingerprint(item.fingerprint_key)
+        seen.add(fp)
+        await upsert_finding(
+            db,
+            app_id=app.id,
+            target_id=None,
+            source=FindingSource.trivy,
+            severity=_severity(item.severity),
+            title=item.title,
+            detail=item.detail,
+            fingerprint=fp,
+            notify=True,
+        )
+    await mark_absent_fixed(db, app_id=app.id, source=FindingSource.trivy, seen_fingerprints=seen)
+
+
+async def _gitleaks(db, app: App) -> None:
+    if not app.git_url:
+        raise RuntimeError("git_url not set on app")
+    work = Path(f"/tmp/straz-git/{app.id}-gitleaks")
+    ok, err = await git_clone(app.git_url, work)
+    if not ok:
+        raise RuntimeError(err)
+    seen: set[str] = set()
+    try:
+        for item in await run_gitleaks(work):
+            fp = make_fingerprint(item.fingerprint_key)
+            seen.add(fp)
+            await upsert_finding(
+                db,
+                app_id=app.id,
+                target_id=None,
+                source=FindingSource.gitleaks,
+                severity=_severity(item.severity),
+                title=item.title,
+                detail=item.detail,
+                fingerprint=fp,
+                notify=True,
+            )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    await mark_absent_fixed(
+        db, app_id=app.id, source=FindingSource.gitleaks, seen_fingerprints=seen
+    )
+
+
 async def heartbeat_all(ctx) -> None:
     async with SessionLocal() as db:
         apps = (await db.scalars(select(App).where(App.heartbeat_enabled.is_(True)))).all()
@@ -251,20 +463,48 @@ async def nuclei_weekly_all(ctx) -> None:
         await db.commit()
 
 
-def _parse_cron(expr: str):
-    # "0 3 * * 1" -> minute hour day month weekday
+async def supply_chain_weekly_all(ctx) -> None:
+    async with SessionLocal() as db:
+        apps = (
+            await db.scalars(
+                select(App).where(
+                    (App.trivy_enabled.is_(True) & App.git_url.is_not(None))
+                    | (App.trivy_enabled.is_(True) & App.image_ref.is_not(None))
+                    | (App.gitleaks_enabled.is_(True) & App.git_url.is_not(None))
+                )
+            )
+        ).all()
+        for app in apps:
+            if app.trivy_enabled and app.git_url:
+                run = ScanRun(app_id=app.id, profile=ScanProfile.trivy_fs, status=RunStatus.queued)
+                db.add(run)
+                await db.flush()
+                await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
+            if app.trivy_enabled and app.image_ref:
+                run = ScanRun(app_id=app.id, profile=ScanProfile.trivy_image, status=RunStatus.queued)
+                db.add(run)
+                await db.flush()
+                await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
+            if app.gitleaks_enabled and app.git_url:
+                run = ScanRun(app_id=app.id, profile=ScanProfile.gitleaks, status=RunStatus.queued)
+                db.add(run)
+                await db.flush()
+                await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
+        await db.commit()
+
+
+def _parse_cron(expr: str, fn):
     parts = expr.split()
     if len(parts) != 5:
-        return cron(nuclei_weekly_all, hour=3, minute=0, weekday=0)
+        return cron(fn, hour=3, minute=0, weekday=0)
     minute, hour, _dom, _mon, dow = parts
 
     def _num(v: str, default: int = 0) -> int:
         return default if v == "*" else int(v)
 
-    # arq weekday: 0=Mon ... 6=Sun; cron often 0/7=Sun 1=Mon
     wd = None if dow == "*" else (int(dow) + 6) % 7
     return cron(
-        nuclei_weekly_all,
+        fn,
         hour=_num(hour, 3),
         minute=_num(minute, 0),
         weekday=wd if wd is not None else 0,
@@ -278,10 +518,16 @@ async def startup(ctx) -> None:
 
 class WorkerSettings:
     settings = get_settings()
-    functions = [execute_scan_run, heartbeat_all, nuclei_weekly_all]
+    functions = [
+        execute_scan_run,
+        heartbeat_all,
+        nuclei_weekly_all,
+        supply_chain_weekly_all,
+    ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     cron_jobs = [
         cron(heartbeat_all, minute={i for i in range(0, 60, max(1, settings.heartbeat_interval_minutes))}),
-        _parse_cron(settings.nuclei_weekly_cron),
+        _parse_cron(settings.nuclei_weekly_cron, nuclei_weekly_all),
+        _parse_cron(settings.supply_chain_weekly_cron, supply_chain_weekly_all),
     ]

@@ -83,8 +83,9 @@ async def update_app(
         setattr(app, key, value)
     await write_audit(db, action="app.update", user_id=user.id, entity_type="app", entity_id=str(app.id))
     await db.commit()
-    await db.refresh(app)
-    return app
+    return await db.scalar(  # type: ignore[return-value]
+        select(App).where(App.id == app_id).options(selectinload(App.targets))
+    )
 
 
 @router.delete("/apps/{app_id}", status_code=status.HTTP_204_NO_CONTENT)

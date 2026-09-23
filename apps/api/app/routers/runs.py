@@ -11,12 +11,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models import App, RunStatus, ScanProfile, ScanRun, TargetStatus, User
+from app.models import App, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, User
 from app.rate_limit import client_ip, run_limiter
 from app.schemas import RunCreate, RunOut
 from app.services.audit import write_audit
 
 router = APIRouter(tags=["runs"])
+
+PROFILE_FLAGS = {
+    ScanProfile.heartbeat: "heartbeat_enabled",
+    ScanProfile.tls: "tls_enabled",
+    ScanProfile.http: "http_enabled",
+    ScanProfile.safe: "safe_enabled",
+    ScanProfile.internetdb: "internetdb_enabled",
+    ScanProfile.subdomain: "subdomain_enabled",
+    ScanProfile.ports: "ports_enabled",
+    ScanProfile.trivy_fs: "trivy_enabled",
+    ScanProfile.trivy_image: "trivy_enabled",
+    ScanProfile.gitleaks: "gitleaks_enabled",
+}
 
 
 @router.get("/runs", response_model=list[RunOut])
@@ -58,18 +71,16 @@ async def create_run(
         raise HTTPException(status_code=404, detail="App not found")
 
     profile = body.profile
-    if profile == ScanProfile.heartbeat and not app.heartbeat_enabled:
-        raise HTTPException(status_code=400, detail="Heartbeat disabled for app")
-    if profile == ScanProfile.tls and not app.tls_enabled:
-        raise HTTPException(status_code=400, detail="TLS profile disabled")
-    if profile == ScanProfile.http and not app.http_enabled:
-        raise HTTPException(status_code=400, detail="HTTP profile disabled")
-    if profile == ScanProfile.safe and not app.safe_enabled:
-        raise HTTPException(status_code=400, detail="Safe profile disabled")
+    flag = PROFILE_FLAGS.get(profile)
+    if flag and not getattr(app, flag, True):
+        raise HTTPException(status_code=400, detail=f"Profile {profile.value} disabled for app")
+
+    if profile in (ScanProfile.trivy_fs, ScanProfile.gitleaks) and not app.git_url:
+        raise HTTPException(status_code=400, detail="Set git_url on the app first")
+    if profile == ScanProfile.trivy_image and not app.image_ref:
+        raise HTTPException(status_code=400, detail="Set image_ref on the app first")
 
     if profile != ScanProfile.heartbeat:
-        from app.models import Target
-
         verified_count = await db.scalar(
             select(Target.id).where(Target.app_id == app_id, Target.status == TargetStatus.verified).limit(1)
         )

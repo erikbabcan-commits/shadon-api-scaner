@@ -12,6 +12,18 @@ export type Target = {
   verified_at: string | null;
 };
 
+export type ScanProfile =
+  | "heartbeat"
+  | "tls"
+  | "http"
+  | "safe"
+  | "internetdb"
+  | "subdomain"
+  | "ports"
+  | "trivy_fs"
+  | "trivy_image"
+  | "gitleaks";
+
 export type AppItem = {
   id: string;
   name: string;
@@ -21,6 +33,13 @@ export type AppItem = {
   tls_enabled: boolean;
   http_enabled: boolean;
   safe_enabled: boolean;
+  internetdb_enabled: boolean;
+  subdomain_enabled: boolean;
+  ports_enabled: boolean;
+  trivy_enabled: boolean;
+  gitleaks_enabled: boolean;
+  git_url: string | null;
+  image_ref: string | null;
   last_status_code: number | null;
   last_latency_ms: number | null;
   last_title: string | null;
@@ -33,7 +52,7 @@ export type AppItem = {
 export type Run = {
   id: string;
   app_id: string;
-  profile: "heartbeat" | "tls" | "http" | "safe";
+  profile: ScanProfile;
   status: "queued" | "running" | "done" | "failed";
   error: string | null;
   started_at: string | null;
@@ -117,6 +136,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updateApp: (
+    id: string,
+    body: Partial<{ git_url: string | null; image_ref: string | null }>,
+  ) =>
+    request<AppItem>(`/api/apps/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   deleteApp: (id: string) => request<void>(`/api/apps/${id}`, { method: "DELETE" }),
   addTarget: (appId: string, host: string) =>
     request<Target>(`/api/apps/${appId}/targets`, {
@@ -133,7 +160,7 @@ export const api = {
   runs: (appId?: string) =>
     request<Run[]>(appId ? `/api/runs?app_id=${appId}` : "/api/runs"),
   run: (id: string) => request<Run>(`/api/runs/${id}`),
-  createRun: (appId: string, profile: Run["profile"]) =>
+  createRun: (appId: string, profile: ScanProfile) =>
     request<Run>(`/api/apps/${appId}/runs`, {
       method: "POST",
       body: JSON.stringify({ profile }),

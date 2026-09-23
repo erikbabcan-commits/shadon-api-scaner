@@ -1,9 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { api, type Run } from "@/lib/api";
+import { api, type ScanProfile } from "@/lib/api";
 import { useOnline } from "@/lib/useOnline";
+
+const SCAN_BUTTONS: Array<[ScanProfile, string, boolean]> = [
+  ["heartbeat", "Heartbeat", false],
+  ["tls", "TLS", true],
+  ["http", "HTTP", true],
+  ["safe", "Nuclei safe", true],
+  ["internetdb", "InternetDB", true],
+  ["subdomain", "Subfinder", true],
+  ["ports", "Naabu ports", true],
+  ["trivy_fs", "Trivy fs", true],
+  ["trivy_image", "Trivy image", true],
+  ["gitleaks", "Gitleaks", true],
+];
 
 export function AppDetailPage() {
   const params = useParams({ strict: false }) as { appId?: string };
@@ -11,6 +24,8 @@ export function AppDetailPage() {
   const qc = useQueryClient();
   const online = useOnline();
   const [host, setHost] = useState("");
+  const [gitUrl, setGitUrl] = useState("");
+  const [imageRef, setImageRef] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
   const app = useQuery({
@@ -19,11 +34,19 @@ export function AppDetailPage() {
     enabled: Boolean(appId),
   });
 
+  useEffect(() => {
+    if (app.data) {
+      setGitUrl(app.data.git_url ?? "");
+      setImageRef(app.data.image_ref ?? "");
+    }
+  }, [app.data]);
+
   const invalidate = async () => {
     await qc.invalidateQueries({ queryKey: ["app", appId] });
     await qc.invalidateQueries({ queryKey: ["apps"] });
     await qc.invalidateQueries({ queryKey: ["overview"] });
     await qc.invalidateQueries({ queryKey: ["runs"] });
+    await qc.invalidateQueries({ queryKey: ["findings"] });
   };
 
   const addTarget = useMutation({
@@ -47,7 +70,17 @@ export function AppDetailPage() {
   });
 
   const runScan = useMutation({
-    mutationFn: (profile: Run["profile"]) => api.createRun(appId, profile),
+    mutationFn: (profile: ScanProfile) => api.createRun(appId, profile),
+    onSuccess: invalidate,
+    onError: (e: Error) => setMsg(e.message),
+  });
+
+  const saveMeta = useMutation({
+    mutationFn: () =>
+      api.updateApp(appId, {
+        git_url: gitUrl.trim() || null,
+        image_ref: imageRef.trim() || null,
+      }),
     onSuccess: invalidate,
     onError: (e: Error) => setMsg(e.message),
   });
@@ -83,28 +116,21 @@ export function AppDetailPage() {
           <div className="card" style={{ marginBottom: "0.75rem" }}>
             <strong>Skeny</strong>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
-              {(
-                [
-                  ["heartbeat", "Heartbeat"],
-                  ["tls", "TLS"],
-                  ["http", "HTTP"],
-                  ["safe", "Nuclei safe"],
-                ] as const
-              ).map(([profile, label]) => (
+              {SCAN_BUTTONS.map(([profile, label, needsVerified]) => (
                 <button
                   key={profile}
                   className="btn"
                   disabled={
                     !online ||
                     runScan.isPending ||
-                    (profile !== "heartbeat" && !hasVerified)
+                    (needsVerified && !hasVerified)
                   }
                   onClick={() => {
                     setMsg(null);
                     runScan.mutate(profile);
                   }}
                   title={
-                    profile !== "heartbeat" && !hasVerified
+                    needsVerified && !hasVerified
                       ? "Najprv over target"
                       : !online
                         ? "Offline"
@@ -117,9 +143,43 @@ export function AppDetailPage() {
             </div>
             {!hasVerified && (
               <p style={{ color: "var(--warn)", fontSize: "0.85rem", marginBottom: 0 }}>
-                TLS / HTTP / Nuclei sú disabled, kým nie je aspoň jeden verified target.
+                Ťažké / pasívne skeny (okrem heartbeat) sú disabled, kým nie je aspoň jeden verified
+                target.
               </p>
             )}
+          </div>
+
+          <div className="card" style={{ marginBottom: "0.75rem" }}>
+            <strong>Supply chain</strong>
+            <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 6 }}>
+              Pre Trivy fs / Gitleaks nastav git URL; pre Trivy image nastav image ref (len vlastné
+              repo/image).
+            </p>
+            <div style={{ display: "grid", gap: "0.5rem", marginTop: "0.75rem" }}>
+              <input
+                className="input"
+                placeholder="git_url (https://…)"
+                value={gitUrl}
+                onChange={(e) => setGitUrl(e.target.value)}
+              />
+              <input
+                className="input"
+                placeholder="image_ref (registry/app:tag)"
+                value={imageRef}
+                onChange={(e) => setImageRef(e.target.value)}
+              />
+              <button
+                className="btn btn-primary"
+                type="button"
+                disabled={!online || saveMeta.isPending}
+                onClick={() => {
+                  setMsg(null);
+                  saveMeta.mutate();
+                }}
+              >
+                Uložiť
+              </button>
+            </div>
           </div>
 
           <div className="card" style={{ marginBottom: "0.75rem" }}>
