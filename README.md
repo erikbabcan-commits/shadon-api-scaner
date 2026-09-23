@@ -99,12 +99,14 @@ Vite proxy posiela `/api` na `http://127.0.0.1:8000`.
 
 ```bash
 cd deploy
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
+
+`--env-file ../.env` je povinné: Compose interpoluje `STRAZ_DOMAIN` z tohto súboru (root `.env`), nie z `deploy/.env`.
 
 Caddy (`Caddyfile.https`) získá TLS cert automaticky pre `STRAZ_DOMAIN`. PWA + API sú na rovnakom origin.
 
-Lokálny vývoj ostáva na `docker compose up --build` → http://localhost:8080 (HTTP Caddyfile).
+Lokálny vývoj (Windows / bez domény): **bez** `docker-compose.prod.yml` — len `docker compose up --build` → http://localhost:8080.
 
 ## Bezpečnosť
 

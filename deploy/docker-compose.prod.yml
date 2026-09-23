@@ -1,6 +1,7 @@
-# Production overlay — use with:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Production overlay — use with (from deploy/):
+#   docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
+# Compose interpolates ${STRAZ_DOMAIN} from --env-file (not from env_file: on services).
 # Requires in ../.env:
 #   STRAZ_DOMAIN=straz.example.com
 #   STRAZ_COOKIE_SECURE=true
