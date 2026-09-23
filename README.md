@@ -86,9 +86,25 @@ Vite proxy posiela `/api` na `http://127.0.0.1:8000`.
 
 ## VPS
 
-1. Skopíruj repo, uprav `.env` (`STRAZ_COOKIE_SECURE=true`, silné heslo/secret, `NTFY_*`).
-2. Pre HTTPS nahraď `deploy/Caddyfile` variantou s doménou (Caddy automatic HTTPS) alebo daj reverse proxy pred `:8080`.
-3. `docker compose -f deploy/docker-compose.yml up -d --build`
+1. Skopíruj repo na VPS, vytvor `.env` z `.env.example`.
+2. Nastav produkčné hodnoty:
+   - `STRAZ_DOMAIN=straz.example.com` (DNS A/AAAA na VPS)
+   - `ACME_EMAIL=you@example.com`
+   - `STRAZ_COOKIE_SECURE=true`
+   - `STRAZ_SESSION_SECRET` a `STRAZ_ADMIN_PASSWORD` (silné, unikátne)
+   - `POSTGRES_PASSWORD` + zhodný `DATABASE_URL`
+   - `NTFY_URL` / `NTFY_TOPIC` (ideálne self-host; `ntfy.sh` je rate-limitovaný)
+3. Otvor firewall **80/tcp** a **443/tcp** (Let's Encrypt).
+4. Spusti:
+
+```bash
+cd deploy
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Caddy (`Caddyfile.https`) získá TLS cert automaticky pre `STRAZ_DOMAIN`. PWA + API sú na rovnakom origin.
+
+Lokálny vývoj ostáva na `docker compose up --build` → http://localhost:8080 (HTTP Caddyfile).
 
 ## Bezpečnosť
 
@@ -96,3 +112,4 @@ Vite proxy posiela `/api` na `http://127.0.0.1:8000`.
 - Nuclei safe / InternetDB / scoped naabu sú úmyselne neintrusívne.
 - Jeden ťažký sken naraz (Redis lock).
 - Audit log: login, verify, run, finding update.
+- Ntfy Title headery sú ASCII-safe (UTF-8 ide v tele správy).

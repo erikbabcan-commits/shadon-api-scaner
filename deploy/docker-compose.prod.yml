@@ -1,0 +1,32 @@
+# Production overlay — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires in ../.env:
+#   STRAZ_DOMAIN=straz.example.com
+#   STRAZ_COOKIE_SECURE=true
+#   STRAZ_SESSION_SECRET=<long random>
+#   STRAZ_ADMIN_PASSWORD=<strong>
+#   NTFY_TOPIC=<topic>   # or self-hosted NTFY_URL
+
+services:
+  caddy:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile.https:/etc/caddy/Caddyfile:ro
+      - web_dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      STRAZ_DOMAIN: ${STRAZ_DOMAIN:?set STRAZ_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+
+  api:
+    environment:
+      STRAZ_COOKIE_SECURE: "true"
+
+  worker:
+    environment:
+      STRAZ_COOKIE_SECURE: "true"
