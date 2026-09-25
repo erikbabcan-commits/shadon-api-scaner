@@ -22,13 +22,15 @@ def make_serializer(settings: Settings) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings.straz_session_secret, salt="straz-session")
 
 
-def create_session_token(settings: Settings, user_id: str) -> str:
-    return make_serializer(settings).dumps({"uid": user_id})
+def create_session_token(settings: Settings, user_id: str, token_version: int = 1) -> str:
+    return make_serializer(settings).dumps({"uid": user_id, "ver": token_version})
 
 
-def read_session_token(settings: Settings, token: str) -> str | None:
+def read_session_token(settings: Settings, token: str) -> dict[str, any] | None:
     try:
         data = make_serializer(settings).loads(token, max_age=settings.straz_session_max_age)
-        return data.get("uid")
-    except (BadSignature, SignatureExpired):
+        if not isinstance(data, dict) or "uid" not in data:
+            return None
+        return {"uid": str(data["uid"]), "ver": int(data.get("ver", 1))}
+    except (BadSignature, SignatureExpired, Exception):
         return None

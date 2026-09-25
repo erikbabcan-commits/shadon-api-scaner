@@ -35,6 +35,61 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+import ipaddress
+from typing import Generic, TypeVar
+from urllib.parse import urlparse
+
+T = TypeVar("T")
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+def _validate_safe_url(url: str) -> str:
+    cleaned = url.strip()
+    parsed = urlparse(cleaned)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("URL must have http or https scheme")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("URL must contain a valid host")
+
+    blocked_hosts = {"localhost", "127.0.0.1", "::1", "169.254.169.254", "metadata.google.internal"}
+    if host.lower() in blocked_hosts:
+        raise ValueError(f"Restricted host '{host}' not allowed")
+
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+            raise ValueError(f"Restricted IP address '{host}' not allowed")
+    except ValueError:
+        pass
+
+    return cleaned
+
+
+def _validate_safe_git_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("https://") or url.startswith("http://") or url.startswith("git@") or url.startswith("ssh://"):
+        if any(c in url for c in [";", "&", "|", "`", "$", "\n", "\r"]):
+            raise ValueError("git_url contains unsafe characters")
+        return url
+    raise ValueError("git_url must use https, http, git@, or ssh protocol")
+
+
+def _validate_safe_image_ref(ref: str | None) -> str | None:
+    if not ref:
+        return None
+    ref = ref.strip()
+    if any(c in ref for c in [";", "&", "|", "`", "$", " ", "\n", "\r"]):
+        raise ValueError("image_ref contains unsafe characters")
+    return ref
+
+
 class AppCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     environment: str = Field(default="prod", max_length=50)
@@ -50,6 +105,21 @@ class AppCreate(BaseModel):
     gitleaks_enabled: bool = True
     git_url: str | None = Field(default=None, max_length=500)
     image_ref: str | None = Field(default=None, max_length=500)
+
+    @field_validator("base_url")
+    @classmethod
+    def check_base_url(cls, v: str) -> str:
+        return _validate_safe_url(v)
+
+    @field_validator("git_url")
+    @classmethod
+    def check_git_url(cls, v: str | None) -> str | None:
+        return _validate_safe_git_url(v)
+
+    @field_validator("image_ref")
+    @classmethod
+    def check_image_ref(cls, v: str | None) -> str | None:
+        return _validate_safe_image_ref(v)
 
 
 class AppUpdate(BaseModel):
@@ -67,6 +137,28 @@ class AppUpdate(BaseModel):
     gitleaks_enabled: bool | None = None
     git_url: str | None = Field(default=None, max_length=500)
     image_ref: str | None = Field(default=None, max_length=500)
+
+    @field_validator("base_url")
+    @classmethod
+    def check_base_url(cls, v: str | None) -> str | None:
+        return _validate_safe_url(v) if v is not None else None
+
+    @field_validator("git_url")
+    @classmethod
+    def check_git_url(cls, v: str | None) -> str | None:
+        return _validate_safe_git_url(v)
+
+    @field_validator("image_ref")
+    @classmethod
+    def check_image_ref(cls, v: str | None) -> str | None:
+        return _validate_safe_image_ref(v)
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: list[T]
+    next_cursor: str | None = None
+    has_more: bool = False
+    total: int | None = None
 
 
 class TargetCreate(BaseModel):

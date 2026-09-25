@@ -38,6 +38,19 @@ class Settings(BaseSettings):
         "5432,5900,6379,8080,8443,9200,27017"
     )
 
+    straz_env: str = "development"
+    straz_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    straz_cookie_samesite: str = "lax"
+    straz_cookie_domain: str | None = None
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.straz_cors_origins.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.straz_env.lower() in ("prod", "production")
+
     @property
     def trusted_nets_list(self) -> list[str]:
         return [n.strip() for n in self.trusted_private_nets.split(",") if n.strip()]

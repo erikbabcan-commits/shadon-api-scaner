@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import logging
 import secrets
 import shutil
 import uuid
@@ -13,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.db import SessionLocal
+from app.logging import setup_logging
 from app.models import (
     App,
     FindingSeverity,
@@ -23,6 +23,9 @@ from app.models import (
     Target,
     TargetStatus,
 )
+from app.routers.findings import _invalidate_overview_cache
+
+logger = logging.getLogger("straz.worker")
 from app.services.findings import make_fingerprint, mark_absent_fixed, upsert_finding
 from app.services.internetdb import fetch_internetdb, resolve_public_ips
 from app.services.ntfy import send_ntfy
@@ -111,6 +114,7 @@ async def execute_scan_run(ctx, run_id: str) -> None:
                 await db.commit()
                 return
 
+        logger.info("Starting scan run %s (profile=%s, app=%s)", run_id, profile.value, app.name)
         await _set_run(db, rid, RunStatus.running)
         await db.commit()
 
@@ -139,9 +143,13 @@ async def execute_scan_run(ctx, run_id: str) -> None:
                 await _set_run(db, rid, RunStatus.failed, f"unknown profile {profile}")
                 await db.commit()
                 return
+
             await _set_run(db, rid, RunStatus.done)
             await db.commit()
+            await _invalidate_overview_cache(settings)
+            logger.info("Scan run %s completed successfully (app=%s)", run_id, app.name)
         except Exception as exc:  # noqa: BLE001
+            logger.exception("Scan run %s failed: %s", run_id, exc)
             await db.rollback()
             async with SessionLocal() as db2:
                 await _set_run(db2, rid, RunStatus.failed, str(exc)[:2000])
@@ -153,6 +161,7 @@ async def execute_scan_run(ctx, run_id: str) -> None:
                     current = current.decode()
                 if current == run_id:
                     await redis.delete(settings.heavy_scan_lock_key)
+                    logger.debug("Released heavy scan lock for run %s", run_id)
 
 
 async def _heartbeat(db, app: App) -> None:
@@ -513,7 +522,17 @@ def _parse_cron(expr: str, fn):
 
 async def startup(ctx) -> None:
     settings = get_settings()
+    setup_logging(settings.is_production)
     ctx["settings"] = settings
+    logger.info("ARQ Worker starting up...")
+
+    binaries = ["nuclei", "tlsx", "httpx", "naabu", "subfinder", "trivy", "gitleaks"]
+    status_map = {b: shutil.which(b) is not None for b in binaries}
+    logger.info("Scanner binary status: %s", status_map)
+
+
+async def shutdown(ctx) -> None:
+    logger.info("ARQ Worker shutting down cleanly.")
 
 
 class WorkerSettings:
@@ -525,6 +544,7 @@ class WorkerSettings:
         supply_chain_weekly_all,
     ]
     on_startup = startup
+    on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     cron_jobs = [
         cron(heartbeat_all, minute={i for i in range(0, 60, max(1, settings.heartbeat_interval_minutes))}),

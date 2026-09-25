@@ -1,0 +1,9 @@
+node_modules
+.env.local
+.env.*.local
+dist
+tests
+__tests__
+*.test.ts
+*.test.tsx
+vitest.config.ts

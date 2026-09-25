@@ -10,16 +10,45 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    TypeDecorator,
+    CHAR,
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type: PG_UUID on PostgreSQL, CHAR(36) on SQLite."""
+
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == "postgresql":
+            return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+        return str(value) if isinstance(value, uuid.UUID) else str(uuid.UUID(str(value)))
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(str(value))
 
 
 class TargetStatus(str, enum.Enum):
@@ -77,16 +106,17 @@ class FindingStatus(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    token_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class App(Base):
     __tablename__ = "apps"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200))
     environment: Mapped[str] = mapped_column(String(50), default="prod")
     base_url: Mapped[str] = mapped_column(String(500))
@@ -116,7 +146,7 @@ class App(Base):
 class Target(Base):
     __tablename__ = "targets"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     app_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("apps.id", ondelete="CASCADE"), index=True)
     host: Mapped[str] = mapped_column(String(500))
     status: Mapped[TargetStatus] = mapped_column(
@@ -133,8 +163,12 @@ class Target(Base):
 
 class ScanRun(Base):
     __tablename__ = "scan_runs"
+    __table_args__ = (
+        Index("ix_scan_runs_app_created", "app_id", "created_at"),
+        Index("ix_scan_runs_status", "status"),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     app_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("apps.id", ondelete="CASCADE"), index=True)
     profile: Mapped[ScanProfile] = mapped_column(Enum(ScanProfile, native_enum=False, length=32))
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus, native_enum=False, length=16), default=RunStatus.queued)
@@ -142,16 +176,20 @@ class ScanRun(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(GUID, nullable=True)
 
     app: Mapped[App] = relationship(back_populates="runs")
 
 
 class Finding(Base):
     __tablename__ = "findings"
-    __table_args__ = (UniqueConstraint("app_id", "fingerprint", name="uq_finding_fingerprint"),)
+    __table_args__ = (
+        UniqueConstraint("app_id", "fingerprint", name="uq_finding_fingerprint"),
+        Index("ix_findings_app_status", "app_id", "status"),
+        Index("ix_findings_status_last_seen", "status", "last_seen_at"),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     app_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("apps.id", ondelete="CASCADE"), index=True)
     target_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("targets.id", ondelete="SET NULL"), nullable=True
@@ -176,8 +214,8 @@ class Finding(Base):
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(GUID, nullable=True)
     action: Mapped[str] = mapped_column(String(100))
     entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

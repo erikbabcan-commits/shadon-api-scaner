@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline — Stráž</title>
+  <style>
+    body {
+      background-color: #0b1120;
+      color: #f1f5f9;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 1.5rem;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 1.5rem;
+      color: #38bdf8;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin: 0 0 0.75rem 0;
+      font-weight: 600;
+    }
+    p {
+      color: #94a3b8;
+      max-width: 24rem;
+      margin: 0 0 1.5rem 0;
+      line-height: 1.5;
+    }
+    button {
+      background-color: #0284c7;
+      color: white;
+      border: none;
+      padding: 0.625rem 1.25rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    button:hover {
+      background-color: #0369a1;
+    }
+  </style>
+</head>
+<body>
+  <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-2.829-2.829m0 0l2.829-2.829m-2.829 2.829L3 21m12.728-15.364l-2.829 2.829M8.464 15.536L5.636 18.364m0 0L3 21m0 0l18-18" />
+  </svg>
+  <h1>Ste offline</h1>
+  <p>Zdá sa, že momentálne nemáte pripojenie na internet. Skontrolujte svoje sieťové pripojenie a skúste to znova.</p>
+  <button onclick="window.location.reload()">Skúsiť znova</button>
+</body>
+</html>

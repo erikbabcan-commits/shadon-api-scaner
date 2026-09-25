@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
-from arq import create_pool
+from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -16,6 +17,7 @@ from app.rate_limit import client_ip, run_limiter
 from app.schemas import RunCreate, RunOut
 from app.services.audit import write_audit
 
+logger = logging.getLogger("straz.runs")
 router = APIRouter(tags=["runs"])
 
 PROFILE_FLAGS = {
@@ -31,17 +33,41 @@ PROFILE_FLAGS = {
     ScanProfile.gitleaks: "gitleaks_enabled",
 }
 
+_arq_pool: ArqRedis | None = None
+
+
+async def get_arq_redis(settings: Settings) -> ArqRedis:
+    global _arq_pool
+    if _arq_pool is None:
+        _arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    return _arq_pool
+
 
 @router.get("/runs", response_model=list[RunOut])
 async def list_runs(
+    response: Response,
     app_id: uuid.UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[ScanRun]:
-    stmt = select(ScanRun).order_by(ScanRun.created_at.desc()).limit(100)
+    count_stmt = select(func.count()).select_from(ScanRun)
+    stmt = select(ScanRun).order_by(ScanRun.created_at.desc())
+
     if app_id:
+        count_stmt = count_stmt.where(ScanRun.app_id == app_id)
         stmt = stmt.where(ScanRun.app_id == app_id)
-    return list(await db.scalars(stmt))
+
+    total = await db.scalar(count_stmt) or 0
+    items = list(await db.scalars(stmt.offset(offset).limit(limit)))
+
+    has_more = (offset + len(items)) < total
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Has-More"] = "true" if has_more else "false"
+    response.headers["X-Next-Offset"] = str(offset + len(items)) if has_more else ""
+
+    return items
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)
@@ -61,11 +87,12 @@ async def create_run(
     app_id: uuid.UUID,
     body: RunCreate,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> ScanRun:
-    run_limiter.check(f"run:{client_ip(request)}:{user.id}")
+    await run_limiter.check(f"run:{client_ip(request)}:{user.id}", response=response)
     app = await db.get(App, app_id)
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
@@ -106,10 +133,10 @@ async def create_run(
     await db.commit()
     await db.refresh(run)
 
-    redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     try:
+        redis = await get_arq_redis(settings)
         await redis.enqueue_job("execute_scan_run", str(run.id))
-    finally:
-        await redis.close()
+    except Exception as exc:
+        logger.error("Failed to enqueue scan run %s to ARQ: %s", run.id, exc)
 
     return run

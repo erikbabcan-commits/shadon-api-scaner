@@ -1,6 +1,6 @@
 [project]
 name = "straz-api"
-version = "0.1.0"
+version = "1.0.0"
 description = "Straz monitoring API"
 requires-python = ">=3.12"
 dependencies = [
@@ -21,6 +21,13 @@ dependencies = [
   "email-validator>=2.2.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.24.0",
+  "aiosqlite>=0.20.0",
+]
+
 [build-system]
 requires = ["setuptools>=75.0.0"]
 build-backend = "setuptools.build_meta"
@@ -28,3 +35,11 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+  "ignore::DeprecationWarning",
+]

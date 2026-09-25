@@ -2,15 +2,80 @@
 #   docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # Compose interpolates ${STRAZ_DOMAIN} from --env-file (not from env_file: on services).
-# Requires in ../.env:
-#   STRAZ_DOMAIN=straz.example.com
+# When frontend is on Vercel:
+#   STRAZ_CORS_ORIGINS=https://straz.vercel.app,https://your-custom-domain.com
+#   STRAZ_COOKIE_SAMESITE=none
 #   STRAZ_COOKIE_SECURE=true
-#   STRAZ_SESSION_SECRET=<long random>
-#   STRAZ_ADMIN_PASSWORD=<strong>
-#   NTFY_TOPIC=<topic>   # or self-hosted NTFY_URL
 
 services:
+  postgres:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    restart: unless-stopped
+    environment:
+      STRAZ_ENV: "production"
+      STRAZ_COOKIE_SECURE: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  worker:
+    restart: unless-stopped
+    environment:
+      STRAZ_ENV: "production"
+      STRAZ_COOKIE_SECURE: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
   caddy:
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -23,11 +88,13 @@ services:
     environment:
       STRAZ_DOMAIN: ${STRAZ_DOMAIN:?set STRAZ_DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
-
-  api:
-    environment:
-      STRAZ_COOKIE_SECURE: "true"
-
-  worker:
-    environment:
-      STRAZ_COOKIE_SECURE: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
