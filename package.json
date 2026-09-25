@@ -1,7 +1,0 @@
-{
-  "name": "straz-monorepo",
-  "private": true,
-  "workspaces": [
-    "apps/web"
-  ]
-}
