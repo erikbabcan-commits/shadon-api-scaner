@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import uuid
 
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,6 +71,40 @@ async def list_runs(
     response.headers["X-Next-Offset"] = str(offset + len(items)) if has_more else ""
 
     return items
+
+
+@router.get("/runs/stream")
+async def stream_runs(
+    request: Request,
+    app_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    async def event_generator():
+        while True:
+            if await request.is_disconnected():
+                break
+            stmt = select(ScanRun).order_by(ScanRun.created_at.desc()).limit(20)
+            if app_id:
+                stmt = stmt.where(ScanRun.app_id == app_id)
+            items = list(await db.scalars(stmt))
+            payload = [
+                {
+                    "id": str(r.id),
+                    "app_id": str(r.app_id),
+                    "profile": r.profile.value,
+                    "status": r.status.value,
+                    "error": r.error,
+                    "started_at": r.started_at.isoformat() if r.started_at else None,
+                    "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in items
+            ]
+            yield f"data: {json.dumps(payload)}\n\n"
+            await asyncio.sleep(2)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)

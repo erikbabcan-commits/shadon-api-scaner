@@ -142,6 +142,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  register: (email: string, password: string) =>
+    request<User>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
   changePassword: (old_password: string, new_password: string) =>
     request<User>("/api/auth/change-password", {

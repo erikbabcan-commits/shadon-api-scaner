@@ -2,7 +2,13 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
+export function LoginPage({
+  onSuccess,
+  onSwitchToRegister,
+}: {
+  onSuccess: () => void;
+  onSwitchToRegister?: () => void;
+}) {
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("");
 
@@ -90,6 +96,18 @@ export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
               )}
             </button>
           </form>
+
+          {onSwitchToRegister && (
+            <div className="mt-6 pt-4 border-t border-slate-800/80 text-center">
+              <button
+                type="button"
+                onClick={onSwitchToRegister}
+                className="text-xs text-sky-400 hover:text-sky-300 font-medium transition"
+              >
+                Nemáte účet? Zaregistrujte sa
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="text-center text-xs text-slate-500">

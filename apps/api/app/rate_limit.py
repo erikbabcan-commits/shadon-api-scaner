@@ -67,6 +67,28 @@ class RateLimiter:
         window = custom_window or self.window
         full_key = f"straz:ratelimit:{key}"
 
+        settings = get_settings()
+        if settings.straz_env in ("test", "testing"):
+            rem, t = await _in_memory_limiter.check(full_key, limit, window)
+            remaining, ttl = rem, t
+            if remaining == 0 and rem == 0:
+                headers = {
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(ttl),
+                    "Retry-After": str(ttl),
+                }
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Rate limit exceeded. Please try again later.",
+                    headers=headers,
+                )
+            if response is not None:
+                response.headers["X-RateLimit-Limit"] = str(limit)
+                response.headers["X-RateLimit-Remaining"] = str(remaining)
+                response.headers["X-RateLimit-Reset"] = str(ttl)
+            return
+
         remaining: int
         ttl: int
 

@@ -70,3 +70,29 @@ async def test_change_password(auth_client: AsyncClient, test_user: User):
         json={"email": "tester@example.com", "password": "NewSuperPassword999!"},
     )
     assert login_ok.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_register_success(client: AsyncClient):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "newuser@example.com", "password": "RegisterPassword123!"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["email"] == "newuser@example.com"
+
+    # Check that user is logged in
+    me_resp = await client.get("/api/auth/me")
+    assert me_resp.status_code == 200
+    assert me_resp.json()["email"] == "newuser@example.com"
+
+
+@pytest.mark.asyncio
+async def test_register_duplicate(client: AsyncClient, test_user: User):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "tester@example.com", "password": "SomePassword123!"},
+    )
+    assert resp.status_code == 400
+    assert "Používateľ s týmto emailom už existuje" in resp.json()["detail"]
+

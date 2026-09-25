@@ -1,23 +1,52 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonTable } from "@/components/Skeleton";
-import { api } from "@/lib/api";
+import { api, buildApiUrl, Run } from "@/lib/api";
 import { formatDate, formatTimeAgo } from "@/lib/format";
 
 export function RunsPage() {
+  const queryClient = useQueryClient();
+
   const runs = useQuery({
     queryKey: ["runs"],
     queryFn: () => api.runs(),
     refetchInterval: (query) => {
-      // Poll faster (every 3s) if any scans are queued or running
       const hasActive = (query.state.data ?? []).some(
         (r) => r.status === "queued" || r.status === "running",
       );
-      return hasActive ? 3_000 : 10_000;
+      return hasActive ? 5_000 : 15_000;
     },
   });
+
+  useEffect(() => {
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(buildApiUrl("/api/runs/stream"), {
+        withCredentials: true,
+      });
+      es.onmessage = (event) => {
+        try {
+          const streamData = JSON.parse(event.data) as Run[];
+          if (Array.isArray(streamData)) {
+            queryClient.setQueryData(["runs"], streamData);
+          }
+        } catch {
+          /* ignore SSE parse error */
+        }
+      };
+    } catch {
+      /* ignore SSE connection failure */
+    }
+
+    return () => {
+      if (es) {
+        es.close();
+      }
+    };
+  }, [queryClient]);
 
   return (
     <AppShell>

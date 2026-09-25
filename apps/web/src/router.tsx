@@ -6,9 +6,10 @@ import {
   Link,
 } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
 import { OverviewPage } from "@/pages/OverviewPage";
 import { AppsListPage } from "@/pages/AppsListPage";
 import { AppDetailPage } from "@/pages/AppDetailPage";
@@ -39,6 +40,7 @@ function NotFound() {
 
 function AuthGate() {
   const queryClient = useQueryClient();
+  const [authView, setAuthView] = useState<"login" | "register">("login");
 
   const me = useQuery({
     queryKey: ["me"],
@@ -75,11 +77,22 @@ function AuthGate() {
   }
 
   if (me.isError || !me.data) {
+    if (authView === "register") {
+      return (
+        <RegisterPage
+          onSuccess={() => {
+            void me.refetch();
+          }}
+          onSwitchToLogin={() => setAuthView("login")}
+        />
+      );
+    }
     return (
       <LoginPage
         onSuccess={() => {
           void me.refetch();
         }}
+        onSwitchToRegister={() => setAuthView("register")}
       />
     );
   }

@@ -33,6 +33,8 @@ OVERVIEW_CACHE_TTL = 30
 
 
 async def _invalidate_overview_cache(settings: Settings) -> None:
+    if settings.straz_env in ("test", "testing"):
+        return
     try:
         r = aioredis.from_url(settings.redis_url, socket_timeout=1.0)
         await r.delete(OVERVIEW_CACHE_KEY)

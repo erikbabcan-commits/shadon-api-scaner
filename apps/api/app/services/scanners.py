@@ -632,3 +632,100 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
             )
         )
     return findings
+
+
+async def run_whois_rdap(host: str) -> list[ToolFinding]:
+    findings: list[ToolFinding] = []
+    domain = host.split(":")[0].strip().lower()
+
+    if not domain or domain.replace(".", "").isdigit() or "." not in domain or domain in {"localhost", "local"}:
+        return findings
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            resp = await client.get(f"https://rdap.org/domain/{domain}")
+            if resp.status_code == 200:
+                data = resp.json()
+                events = data.get("events", [])
+                expiration_date: datetime | None = None
+                for evt in events:
+                    if evt.get("eventAction") in ("expiration", "registration expiration"):
+                        date_str = evt.get("eventDate")
+                        if date_str:
+                            try:
+                                expiration_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                            except ValueError:
+                                pass
+
+                if expiration_date:
+                    days_left = (expiration_date - datetime.now(timezone.utc)).days
+                    if days_left <= 0:
+                        findings.append(
+                            ToolFinding(
+                                title=f"Domain {domain} has expired",
+                                detail=f"RDAP expiration date was {expiration_date.isoformat()}",
+                                severity="critical",
+                                fingerprint_key=f"rdap-expired|{domain}",
+                            )
+                        )
+                    elif days_left < 30:
+                        findings.append(
+                            ToolFinding(
+                                title=f"Domain {domain} expires in {days_left} days",
+                                detail=f"RDAP expiration date is {expiration_date.isoformat()}",
+                                severity="high" if days_left < 14 else "medium",
+                                fingerprint_key=f"rdap-expiring|{domain}",
+                            )
+                        )
+    except Exception:
+        pass
+
+    return findings
+
+
+SECRET_PATTERNS = [
+    (r"AKIA[0-9A-Z]{16}", "AWS Access Key ID"),
+    (r"-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----", "Private RSA/EC/SSH Key"),
+    (r"ghp_[a-zA-Z0-9]{36}", "GitHub Personal Access Token"),
+    (r"xox[b-aprs]-[0-9a-zA-Z]{10,48}", "Slack API Token"),
+    (r"eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+", "Hardcoded JWT Token"),
+    (r"(postgres|mysql|mongodb)://[^:]+:[^@]+@[^/]+", "Database credentials in connection string"),
+]
+
+
+async def run_secrets_sast(path: Path) -> list[ToolFinding]:
+    findings: list[ToolFinding] = []
+    if not path.exists():
+        return findings
+
+    target_files = [
+        p
+        for p in path.rglob("*")
+        if p.is_file()
+        and not any(
+            part.startswith(".") or part in {"node_modules", "venv", ".venv", "dist", "build"}
+            for part in p.parts
+        )
+    ]
+
+    for fpath in target_files[:200]:
+        try:
+            content = fpath.read_text(encoding="utf-8", errors="ignore")
+            for pattern, name in SECRET_PATTERNS:
+                matches = re.finditer(pattern, content)
+                for match in matches:
+                    rel_path = fpath.relative_to(path)
+                    line_num = content[: match.start()].count("\n") + 1
+                    findings.append(
+                        ToolFinding(
+                            title=f"Secret detected: {name} in {rel_path}",
+                            detail=f"Rule: {name}, File: {rel_path}:{line_num}",
+                            severity="high",
+                            fingerprint_key=f"secrets-sast|{name}|{rel_path}|{line_num}",
+                        )
+                    )
+        except OSError:
+            continue
+
+    return findings
+

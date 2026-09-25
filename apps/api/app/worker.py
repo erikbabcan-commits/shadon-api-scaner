@@ -36,10 +36,12 @@ from app.services.scanners import (
     run_httpx_probe,
     run_naabu,
     run_nuclei_safe,
+    run_secrets_sast,
     run_subfinder,
     run_tlsx,
     run_trivy_fs,
     run_trivy_image,
+    run_whois_rdap,
 )
 from app.services.verify import extract_hostname
 
@@ -205,6 +207,20 @@ async def _tls(db, app: App, targets) -> None:
     for target in targets:
         host = extract_hostname(target.host)
         for item in await run_tlsx(host):
+            fp = make_fingerprint(item.fingerprint_key)
+            seen.add(fp)
+            await upsert_finding(
+                db,
+                app_id=app.id,
+                target_id=target.id,
+                source=FindingSource.tls,
+                severity=_severity(item.severity),
+                title=item.title,
+                detail=item.detail,
+                fingerprint=fp,
+                notify=True,
+            )
+        for item in await run_whois_rdap(host):
             fp = make_fingerprint(item.fingerprint_key)
             seen.add(fp)
             await upsert_finding(
@@ -430,6 +446,20 @@ async def _gitleaks(db, app: App) -> None:
     seen: set[str] = set()
     try:
         for item in await run_gitleaks(work):
+            fp = make_fingerprint(item.fingerprint_key)
+            seen.add(fp)
+            await upsert_finding(
+                db,
+                app_id=app.id,
+                target_id=None,
+                source=FindingSource.gitleaks,
+                severity=_severity(item.severity),
+                title=item.title,
+                detail=item.detail,
+                fingerprint=fp,
+                notify=True,
+            )
+        for item in await run_secrets_sast(work):
             fp = make_fingerprint(item.fingerprint_key)
             seen.add(fp)
             await upsert_finding(

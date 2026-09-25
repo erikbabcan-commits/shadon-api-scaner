@@ -9,7 +9,7 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models import User
 from app.rate_limit import change_password_limiter, client_ip, login_limiter
-from app.schemas import ChangePasswordRequest, LoginRequest, UserOut
+from app.schemas import ChangePasswordRequest, LoginRequest, RegisterRequest, UserOut
 from app.security import create_session_token, hash_password, verify_password
 from app.services.audit import write_audit
 
@@ -57,6 +57,38 @@ def _clear_auth_cookie(response: Response, settings: Settings) -> None:
     )
     response.delete_cookie(cookie_name, path="/", domain=settings.straz_cookie_domain)
     response.delete_cookie(settings.straz_cookie_name, path="/", domain=settings.straz_cookie_domain)
+
+
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def register(
+    body: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> User:
+    await login_limiter.check(f"register:{client_ip(request)}", response=response)
+    existing = await db.scalar(select(User).where(User.email == body.email.lower()))
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Používateľ s týmto emailom už existuje",
+        )
+
+    user = User(
+        email=body.email.lower(),
+        password_hash=hash_password(body.password),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = create_session_token(settings, str(user.id), user.token_version)
+    _set_auth_cookie(response, token, settings)
+
+    await write_audit(db, action="auth.register", user_id=user.id)
+    await db.commit()
+    return user
 
 
 @router.post("/login", response_model=UserOut)
