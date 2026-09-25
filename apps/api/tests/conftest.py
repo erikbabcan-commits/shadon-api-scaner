@@ -21,17 +21,16 @@ from app.main import app
 from app.models import User
 from app.security import create_session_token, hash_password
 
+from sqlalchemy.pool import StaticPool
+
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
-test_engine = create_async_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+test_engine = create_async_engine(
+    TEST_DB_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestingSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False, class_=AsyncSession)
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture(scope="function")
