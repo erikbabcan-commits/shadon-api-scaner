@@ -26,7 +26,7 @@ class InMemorySlidingWindow:
                 q.popleft()
             if len(q) >= limit:
                 remaining_ttl = int(window - (now - q[0])) if q else window
-                return 0, max(1, remaining_ttl)
+                return -1, max(1, remaining_ttl)
             q.append(now)
             remaining = limit - len(q)
             ttl = int(window - (now - q[0])) if q else window
@@ -71,7 +71,7 @@ class RateLimiter:
         if settings.straz_env in ("test", "testing"):
             rem, t = await _in_memory_limiter.check(full_key, limit, window)
             remaining, ttl = rem, t
-            if remaining == 0 and rem == 0:
+            if remaining < 0:
                 headers = {
                     "X-RateLimit-Limit": str(limit),
                     "X-RateLimit-Remaining": "0",
@@ -94,16 +94,16 @@ class RateLimiter:
 
         try:
             r = get_redis_client()
-            pipe = r.pipeline()
-            pipe.incr(full_key)
-            pipe.ttl(full_key)
-            current_hits, current_ttl = await pipe.execute()
-
-            if current_hits == 1 or current_ttl == -1:
-                await r.expire(full_key, window)
-                ttl = window
-            else:
-                ttl = max(1, current_ttl)
+            # Atomic counter + expiry: no worker can leave an unbounded counter
+            # between INCR and EXPIRE, and all instances share the same budget.
+            current_hits, ttl = await r.eval(
+                "local hits = redis.call('INCR', KEYS[1]); "
+                "local ttl = redis.call('TTL', KEYS[1]); "
+                "if ttl < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]); ttl = tonumber(ARGV[1]); end; "
+                "return {hits, ttl}",
+                1, full_key, window,
+            )
+            ttl = max(1, int(ttl))
 
             if current_hits > limit:
                 headers = {
@@ -121,10 +121,13 @@ class RateLimiter:
             remaining = max(0, limit - current_hits)
 
         except (aioredis.RedisError, OSError):
+            if settings.is_production:
+                # Local fallback would multiply the allowance by instance count.
+                raise HTTPException(status_code=503, detail="Rate limiter unavailable") from None
             # Fallback to in-memory limiter when Redis is unreachable (e.g. testing or local dev)
             rem, t = await _in_memory_limiter.check(full_key, limit, window)
             remaining, ttl = rem, t
-            if remaining == 0 and rem == 0:
+            if remaining < 0:
                 # check if exceeded
                 headers = {
                     "X-RateLimit-Limit": str(limit),

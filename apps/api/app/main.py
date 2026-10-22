@@ -111,7 +111,7 @@ async def security_and_tracing_middleware(request: Request, call_next):
     # Custom headers like X-Requested-With or standard Origin validation
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         origin = request.headers.get("origin")
-        if origin and settings.is_production:
+        if settings.is_production:
             # Check if origin is in allowed origins
             if origin not in settings.cors_origins_list:
                 logger.warning("Rejected mutating request with untrusted origin: %s", origin)
