@@ -1,6 +1,6 @@
 # Stráž — Bezpečnostný monitoring a audit vlastných aplikácií
 
-[![CI Pipeline](https://github.com/your-org/straz/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/straz/actions/workflows/ci.yml)
+[![CI Pipeline](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml/badge.svg)](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB.svg)](https://react.dev)
@@ -205,3 +205,15 @@ npm run build
 ## 📄 Licencia
 
 Tento projekt je distribuovaný pod licenciou MIT. Viac informácií nájdete v súbore `LICENSE`.
+
+## Verification limits
+
+This is a monitoring prototype, not a security certification. Test scan targets
+must be owned and explicitly verified; unit tests use synthetic fixtures and
+never authorize scanning third-party systems. Production mutating requests
+require an allowlisted Origin, including CLI callers. All instances must share
+the configured Redis quota backend; an unavailable quota backend returns 503
+in production rather than increasing allowance via local fallback.
+
+Web dependency advisories require reachability review and locked rebuilds before
+internet deployment. A frontend HTTP 200 is not a successful API/scan workflow.

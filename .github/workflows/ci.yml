@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   backend-tests:
     name: Backend Pytest & Migrations
@@ -58,18 +61,19 @@ jobs:
       - name: Install backend dependencies
         working-directory: ./apps/api
         run: |
-          uv sync --dev
+          uv sync --frozen --dev
 
       - name: Run Pytest test suite
         working-directory: ./apps/api
         env:
+          QUOTA_REDIS_URL: redis://127.0.0.1:6379/14
           STRAZ_ENV: testing
           DATABASE_URL: postgresql+asyncpg://straz:straz_test_password@localhost:5432/straz_test
           REDIS_URL: redis://localhost:6379/0
           STRAZ_SESSION_SECRET: test-session-secret-for-ci-runs-1234567890
           STRAZ_ADMIN_PASSWORD: test-admin-password-for-ci
         run: |
-          uv run pytest -v
+          uv run --frozen pytest -v
 
   frontend-build:
     name: Frontend TypeScript & Vite Build
@@ -89,7 +93,7 @@ jobs:
       - name: Install frontend dependencies
         working-directory: ./apps/web
         run: |
-          npm ci
+          npm ci --ignore-scripts
 
       - name: Build frontend application
         working-directory: ./apps/web
@@ -97,6 +101,7 @@ jobs:
           VITE_API_URL: https://api.straz.example.com
         run: |
           npm run build
+          npx --no-install tsc --noEmit
 
       - name: Verify build artifacts
         working-directory: ./apps/web
