@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     straz_cookie_samesite: str = "lax"
     straz_cookie_domain: str | None = None
 
+    # Stripe & Billing
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_starter: str = "price_starter_29"
+    stripe_price_pro: str = "price_pro_79"
+    stripe_price_agency: str = "price_agency_199"
+    app_frontend_url: str = "http://localhost:5173"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.straz_cors_origins.split(",") if o.strip()]

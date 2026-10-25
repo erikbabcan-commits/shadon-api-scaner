@@ -16,6 +16,12 @@ import { AppDetailPage } from "@/pages/AppDetailPage";
 import { FindingsPage } from "@/pages/FindingsPage";
 import { RunsPage } from "@/pages/RunsPage";
 import { AccountPage } from "@/pages/AccountPage";
+import { TeamPage } from "@/pages/TeamPage";
+import { BillingPage } from "@/pages/BillingPage";
+import { IntegrationsPage } from "@/pages/IntegrationsPage";
+import { ApiKeysPage } from "@/pages/ApiKeysPage";
+import { AuditLogPage } from "@/pages/AuditLogPage";
+import { InvitationPage } from "@/pages/InvitationPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function NotFound() {
@@ -175,6 +181,66 @@ const accountRoute = createRoute({
   },
 });
 
+const teamRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/team",
+  component: () => (
+    <ErrorBoundary>
+      <TeamPage />
+    </ErrorBoundary>
+  ),
+});
+
+const billingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/billing",
+  component: () => (
+    <ErrorBoundary>
+      <BillingPage />
+    </ErrorBoundary>
+  ),
+});
+
+const integrationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/integrations",
+  component: () => (
+    <ErrorBoundary>
+      <IntegrationsPage />
+    </ErrorBoundary>
+  ),
+});
+
+const apiKeysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/api-keys",
+  component: () => (
+    <ErrorBoundary>
+      <ApiKeysPage />
+    </ErrorBoundary>
+  ),
+});
+
+const auditLogsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/audit-logs",
+  component: () => (
+    <ErrorBoundary>
+      <AuditLogPage />
+    </ErrorBoundary>
+  ),
+});
+
+const invitationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invitations/$token",
+  component: () => (
+    <ErrorBoundary>
+      <InvitationPage />
+    </ErrorBoundary>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   appsRoute,
@@ -182,6 +248,12 @@ const routeTree = rootRoute.addChildren([
   findingsRoute,
   runsRoute,
   accountRoute,
+  teamRoute,
+  billingRoute,
+  integrationsRoute,
+  apiKeysRoute,
+  auditLogsRoute,
+  invitationRoute,
 ]);
 
 export const router = createRouter({

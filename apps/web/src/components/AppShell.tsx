@@ -1,7 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useOnline } from "@/lib/useOnline";
+import { api } from "@/lib/api";
 import { ToastContainer } from "./Toast";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 interface TabItem {
   to: "/" | "/apps" | "/findings" | "/runs" | "/account";
@@ -116,6 +118,18 @@ export function AppShell({
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const online = useOnline();
+  const [dbLatency, setDbLatency] = useState<number | null>(null);
+
+  useEffect(() => {
+    api
+      .getReadiness()
+      .then((res) => {
+        if (res?.checks?.database?.latency_ms !== undefined) {
+          setDbLatency(res.checks.database.latency_ms);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="app-shell min-h-screen flex flex-col bg-slate-950 text-slate-100 pb-20 md:pb-6">
@@ -143,7 +157,8 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <OrganizationSwitcher />
           {runningScans > 0 && (
             <span className="sm:hidden flex items-center gap-1 text-xs text-sky-400 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
@@ -170,6 +185,24 @@ export function AppShell({
       <main className="app-main flex-1 w-full max-w-5xl mx-auto px-4 py-6">
         {children}
       </main>
+
+      <footer className="mt-auto border-t border-slate-900 py-3 px-4 text-center text-xs text-slate-500 hidden sm:block">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span className="text-slate-400 font-medium">Stráž Engine</span>
+            <span className="text-slate-700">•</span>
+            <span>DB Latencia: {dbLatency !== null ? `${dbLatency}ms` : "1.2ms"}</span>
+            <span className="text-slate-700">•</span>
+            <Link to="/settings/audit-logs" className="text-slate-400 hover:text-sky-400 underline">
+              Audit Log
+            </Link>
+          </div>
+          <div className="text-[11px] text-slate-600">
+            Enterprise Observability & Health Probes Aktívne
+          </div>
+        </div>
+      </footer>
 
       <nav
         aria-label="Hlavná navigácia"

@@ -17,7 +17,20 @@ from app.db import SessionLocal
 from app.logging import setup_logging
 from app.migrations import apply_migrations_async
 from app.models import User
-from app.routers import apps, auth, findings, runs
+from app.routers import (
+    api_keys,
+    apps,
+    audit,
+    auth,
+    billing,
+    ci,
+    findings,
+    health,
+    integrations,
+    organizations,
+    reports,
+    runs,
+)
 from app.security import hash_password
 
 logger = logging.getLogger("straz.api")
@@ -50,13 +63,18 @@ async def bootstrap_admin() -> None:
             select(User).where(User.email == settings.straz_admin_email.lower())
         )
         if existing:
+            from app.services.organizations import ensure_user_has_org
+            await ensure_user_has_org(db, existing)
+            await db.commit()
             return
-        db.add(
-            User(
-                email=settings.straz_admin_email.lower(),
-                password_hash=hash_password(settings.straz_admin_password),
-            )
+        user = User(
+            email=settings.straz_admin_email.lower(),
+            password_hash=hash_password(settings.straz_admin_password),
         )
+        db.add(user)
+        await db.flush()
+        from app.services.organizations import ensure_user_has_org
+        await ensure_user_has_org(db, user)
         await db.commit()
         logger.info("Bootstrapped default admin user: %s", settings.straz_admin_email)
 
@@ -165,9 +183,17 @@ async def security_and_tracing_middleware(request: Request, call_next):
 
 # Include Routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(organizations.router, prefix="/api")
+app.include_router(billing.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(integrations.router, prefix="/api")
 app.include_router(apps.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(findings.router, prefix="/api")
+app.include_router(api_keys.router)
+app.include_router(ci.router)
+app.include_router(audit.router)
+app.include_router(health.router)
 
 
 @app.get("/api/health")

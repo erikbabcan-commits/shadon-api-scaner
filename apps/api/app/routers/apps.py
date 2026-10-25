@@ -5,16 +5,17 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import get_current_user
-from app.models import App, Target, TargetStatus, User
+from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
+from app.models import App, OrgRole, Target, TargetStatus, User
 from app.schemas import AppCreate, AppOut, AppUpdate, TargetCreate, TargetOut, TrustPrivateRequest
 from app.services.audit import write_audit
+from app.services.quota import check_app_limit
 from app.services.verify import is_ip_in_trusted_nets, verify_target
 
 router = APIRouter(tags=["apps"])
@@ -32,14 +33,16 @@ async def list_apps(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> list[App]:
-    count_stmt = select(func.count()).select_from(App)
+    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    count_stmt = select(func.count()).select_from(App).where(org_filter)
     total = await db.scalar(count_stmt) or 0
 
     stmt = (
         select(App)
         .options(selectinload(App.targets))
+        .where(org_filter)
         .order_by(App.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -57,10 +60,19 @@ async def list_apps(
 async def create_app(
     body: AppCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> App:
-    app = App(**body.model_dump())
+    allowed, reason = await check_app_limit(db, org_ctx.organization)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=reason,
+            headers={"X-Upgrade-Required": "true"},
+        )
+
+    app_data = body.model_dump()
+    app = App(**app_data, organization_id=org_ctx.org_id)
     db.add(app)
     await db.flush()
 
@@ -73,7 +85,7 @@ async def create_app(
     await write_audit(
         db,
         action="app.create",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="app",
         entity_id=str(app.id),
         detail=app.name,
@@ -88,9 +100,16 @@ async def create_app(
 async def get_app(
     app_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> App:
-    app = await db.scalar(select(App).where(App.id == app_id).options(selectinload(App.targets)))
+    app = await db.scalar(
+        select(App)
+        .where(
+            App.id == app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+        .options(selectinload(App.targets))
+    )
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     return app
@@ -101,10 +120,15 @@ async def update_app(
     app_id: uuid.UUID,
     body: AppUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> App:
-    app = await db.get(App, app_id)
+    app = await db.scalar(
+        select(App).where(
+            App.id == app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     data = body.model_dump(exclude_unset=True)
@@ -113,7 +137,7 @@ async def update_app(
     await write_audit(
         db,
         action="app.update",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="app",
         entity_id=str(app.id),
         detail=",".join(data.keys()),
@@ -128,16 +152,21 @@ async def update_app(
 async def delete_app(
     app_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.admin)),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    app = await db.get(App, app_id)
+    app = await db.scalar(
+        select(App).where(
+            App.id == app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     await write_audit(
         db,
         action="app.delete",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="app",
         entity_id=str(app.id),
         detail=app.name,
@@ -152,9 +181,14 @@ async def add_target(
     app_id: uuid.UUID,
     body: TargetCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
 ) -> Target:
-    app = await db.get(App, app_id)
+    app = await db.scalar(
+        select(App).where(
+            App.id == app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     target = Target(app_id=app_id, host=body.host.strip(), verify_token=secrets.token_urlsafe(24))
@@ -162,7 +196,7 @@ async def add_target(
     await write_audit(
         db,
         action="target.create",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="target",
         entity_id=str(target.id),
         detail=target.host,
@@ -176,15 +210,28 @@ async def add_target(
 async def verify_target_endpoint(
     target_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> Target:
     target = await db.get(Target, target_id)
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
-    app = await db.get(App, target.app_id)
-    verified, method = await verify_target(target.host, target.verify_token, app.base_url if app else None)
-    if not verified:
+    app = await db.scalar(
+        select(App).where(
+            App.id == target.app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
+    if not app:
+        raise HTTPException(status_code=404, detail="Target not found in organization")
+
+    method = await verify_target(
+        host=target.host,
+        base_url=app.base_url,
+        token=target.verify_token,
+        settings=settings,
+    )
+    if not method:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -198,7 +245,7 @@ async def verify_target_endpoint(
     await write_audit(
         db,
         action="target.verify",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="target",
         entity_id=str(target.id),
         detail=method,
@@ -213,7 +260,7 @@ async def trust_private_target(
     target_id: uuid.UUID,
     body: TrustPrivateRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> Target:
     if not body.confirm:
@@ -221,6 +268,14 @@ async def trust_private_target(
     target = await db.get(Target, target_id)
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
+    app = await db.scalar(
+        select(App).where(
+            App.id == target.app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
+    if not app:
+        raise HTTPException(status_code=404, detail="Target not found in organization")
     if not is_ip_in_trusted_nets(target.host, settings.trusted_nets_list):
         raise HTTPException(status_code=400, detail="Host is not in TRUSTED_PRIVATE_NETS")
     target.status = TargetStatus.verified
@@ -230,7 +285,7 @@ async def trust_private_target(
     await write_audit(
         db,
         action="target.trust_private",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="target",
         entity_id=str(target.id),
         detail=target.host,
@@ -238,3 +293,32 @@ async def trust_private_target(
     await db.commit()
     await db.refresh(target)
     return target
+
+
+@router.delete("/targets/{target_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_target(
+    target_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
+) -> None:
+    target = await db.get(Target, target_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Target not found")
+    app = await db.scalar(
+        select(App).where(
+            App.id == target.app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
+    if not app:
+        raise HTTPException(status_code=404, detail="Target not found in organization")
+    await write_audit(
+        db,
+        action="target.delete",
+        user_id=org_ctx.user.id,
+        entity_type="target",
+        entity_id=str(target.id),
+        detail=target.host,
+    )
+    await db.delete(target)
+    await db.commit()

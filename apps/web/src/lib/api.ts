@@ -1,5 +1,35 @@
 export type User = { id: string; email: string };
 
+export type OrgRole = "owner" | "admin" | "member" | "viewer";
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  role: OrgRole;
+  billing_email: string | null;
+  plan_tier: string;
+  created_at: string;
+};
+
+export type OrgMember = {
+  id: string;
+  user_id: string;
+  email: string;
+  role: OrgRole;
+  created_at: string;
+};
+
+export type OrgInvitation = {
+  id: string;
+  org_id: string;
+  email: string;
+  role: OrgRole;
+  token: string;
+  expires_at: string;
+  created_at: string;
+};
+
 export type Target = {
   id: string;
   app_id: string;
@@ -10,6 +40,43 @@ export type Target = {
   trusted_private: boolean;
   created_at: string;
   verified_at: string | null;
+};
+
+export type ApiKey = {
+  id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+};
+
+export type ApiKeyCreated = ApiKey & {
+  raw_key: string;
+  warning: string;
+};
+
+export type AuditLogItem = {
+  id: string;
+  organization_id: string | null;
+  user_id: string | null;
+  actor_email: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  detail: string | null;
+  details: Record<string, any> | null;
+  created_at: string;
+};
+
+export type AuditLogListResponse = {
+  total: number;
+  items: AuditLogItem[];
+  limit: number;
+  offset: number;
 };
 
 export type ScanProfile =
@@ -93,6 +160,27 @@ export type Overview = {
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
+let currentOrgId: string | null =
+  typeof window !== "undefined" ? localStorage.getItem("straz_org_id") : null;
+
+export function getActiveOrgId(): string | null {
+  return currentOrgId;
+}
+
+export function setActiveOrgId(orgId: string | null): void {
+  currentOrgId = orgId;
+  if (typeof window !== "undefined") {
+    if (orgId) {
+      localStorage.setItem("straz_org_id", orgId);
+    } else {
+      localStorage.removeItem("straz_org_id");
+    }
+    window.dispatchEvent(
+      new CustomEvent("straz:org-changed", { detail: { orgId } })
+    );
+  }
+}
+
 export function buildApiUrl(path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
@@ -106,6 +194,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       "Content-Type": "application/json",
       "X-Requested-With": "XMLHttpRequest",
+      ...(currentOrgId ? { "X-Organization-Id": currentOrgId } : {}),
       ...(init?.headers || {}),
     },
     ...init,
@@ -136,6 +225,84 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  getOrgs: () => request<Organization[]>("/api/orgs"),
+  createOrg: (data: { name: string; slug?: string }) =>
+    request<Organization>("/api/orgs", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getOrgMembers: (orgId: string) =>
+    request<OrgMember[]>(`/api/orgs/${orgId}/members`),
+  inviteOrgMember: (orgId: string, data: { email: string; role: OrgRole }) =>
+    request<OrgInvitation>(`/api/orgs/${orgId}/invitations`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  removeOrgMember: (orgId: string, userId: string) =>
+    request<void>(`/api/orgs/${orgId}/members/${userId}`, {
+      method: "DELETE",
+    }),
+  updateOrgMemberRole: (orgId: string, userId: string, role: OrgRole) =>
+    request<OrgMember>(`/api/orgs/${orgId}/members/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  acceptInvitation: (token: string) =>
+    request<{ status: string; org_id: string; role: OrgRole }>(
+      `/api/invitations/${token}/accept`,
+      { method: "POST" }
+    ),
+  getPlans: () => request<{ plans: Record<string, any> }>("/api/billing/plans"),
+  getUsage: () => request<any>("/api/billing/usage"),
+  createCheckoutSession: (tier: string, returnUrl?: string) =>
+    request<{ url: string; mode: string }>("/api/billing/create-checkout-session", {
+      method: "POST",
+      body: JSON.stringify({ tier, return_url: returnUrl }),
+    }),
+  createPortalSession: (returnUrl?: string) =>
+    request<{ url: string; mode: string }>("/api/billing/customer-portal", {
+      method: "POST",
+      body: JSON.stringify({ return_url: returnUrl }),
+    }),
+  getAppCompliance: (appId: string) =>
+    request<any>(`/api/apps/${appId}/compliance`),
+  getBranding: (orgId: string) =>
+    request<{
+      custom_logo_url: string | null;
+      brand_color: string;
+      report_footer_text: string | null;
+      white_label_enabled: boolean;
+    }>(`/api/orgs/${orgId}/branding`),
+  updateBranding: (
+    orgId: string,
+    data: { custom_logo_url?: string; brand_color?: string; report_footer_text?: string }
+  ) =>
+    request<any>(`/api/orgs/${orgId}/branding`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  getReportHtmlUrl: (appId: string) => buildApiUrl(`/api/apps/${appId}/report/html`),
+  getChannels: (orgId: string) =>
+    request<any[]>(`/api/orgs/${orgId}/channels`),
+  createChannel: (orgId: string, data: any) =>
+    request<any>(`/api/orgs/${orgId}/channels`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateChannel: (orgId: string, channelId: string, data: any) =>
+    request<any>(`/api/orgs/${orgId}/channels/${channelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  deleteChannel: (orgId: string, channelId: string) =>
+    request<void>(`/api/orgs/${orgId}/channels/${channelId}`, {
+      method: "DELETE",
+    }),
+  testChannel: (orgId: string, channelId: string) =>
+    request<{ status: string; delivered: boolean }>(
+      `/api/orgs/${orgId}/channels/${channelId}/test`,
+      { method: "POST" }
+    ),
   me: () => request<User>("/api/auth/me"),
   login: (email: string, password: string) =>
     request<User>("/api/auth/login", {
@@ -249,4 +416,36 @@ export const api = {
     }).catch(() => {
       /* ignore reporting failures */
     }),
+  listApiKeys: (orgId: string) => request<ApiKey[]>(`/api/orgs/${orgId}/api-keys`),
+  createApiKey: (
+    orgId: string,
+    data: { name: string; scopes?: string[]; expires_at?: string | null }
+  ) =>
+    request<ApiKeyCreated>(`/api/orgs/${orgId}/api-keys`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteApiKey: (orgId: string, keyId: string) =>
+    request<void>(`/api/orgs/${orgId}/api-keys/${keyId}`, {
+      method: "DELETE",
+    }),
+  getAuditLogs: (orgId: string, params?: { action?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.action) q.set("action", params.action);
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    return request<AuditLogListResponse>(`/api/orgs/${orgId}/audit-logs${qs ? `?${qs}` : ""}`);
+  },
+  exportAuditCsvUrl: (orgId: string) => `/api/orgs/${orgId}/audit-logs/export.csv`,
+  getLiveness: () => request<{ status: string; uptime_seconds: number }>("/healthz/liveness"),
+  getReadiness: () =>
+    request<{
+      status: string;
+      ready: boolean;
+      checks: {
+        database: { status: string; latency_ms: number; error: string | null };
+        redis: { status: string; latency_ms: number; error: string | null };
+      };
+    }>("/healthz/readiness"),
 };
