@@ -15,6 +15,7 @@ from app.deps import OrgContext, get_current_org, get_current_user, require_org_
 from app.models import App, OrgRole, Target, TargetStatus, User
 from app.schemas import AppCreate, AppOut, AppUpdate, TargetCreate, TargetOut, TrustPrivateRequest
 from app.services.audit import write_audit
+from app.services.quota import check_app_limit
 from app.services.verify import is_ip_in_trusted_nets, verify_target
 
 router = APIRouter(tags=["apps"])
@@ -62,6 +63,14 @@ async def create_app(
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> App:
+    allowed, reason = await check_app_limit(db, org_ctx.organization)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=reason,
+            headers={"X-Upgrade-Required": "true"},
+        )
+
     app_data = body.model_dump()
     app = App(**app_data, organization_id=org_ctx.org_id)
     db.add(app)

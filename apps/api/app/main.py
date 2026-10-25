@@ -17,7 +17,7 @@ from app.db import SessionLocal
 from app.logging import setup_logging
 from app.migrations import apply_migrations_async
 from app.models import User
-from app.routers import apps, auth, findings, organizations, runs
+from app.routers import apps, auth, billing, findings, organizations, runs
 from app.security import hash_password
 
 logger = logging.getLogger("straz.api")
@@ -171,6 +171,7 @@ async def security_and_tracing_middleware(request: Request, call_next):
 # Include Routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")
+app.include_router(billing.router, prefix="/api")
 app.include_router(apps.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(findings.router, prefix="/api")

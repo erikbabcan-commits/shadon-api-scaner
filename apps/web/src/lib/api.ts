@@ -215,6 +215,18 @@ export const api = {
       `/api/invitations/${token}/accept`,
       { method: "POST" }
     ),
+  getPlans: () => request<{ plans: Record<string, any> }>("/api/billing/plans"),
+  getUsage: () => request<any>("/api/billing/usage"),
+  createCheckoutSession: (tier: string, returnUrl?: string) =>
+    request<{ url: string; mode: string }>("/api/billing/create-checkout-session", {
+      method: "POST",
+      body: JSON.stringify({ tier, return_url: returnUrl }),
+    }),
+  createPortalSession: (returnUrl?: string) =>
+    request<{ url: string; mode: string }>("/api/billing/customer-portal", {
+      method: "POST",
+      body: JSON.stringify({ return_url: returnUrl }),
+    }),
   me: () => request<User>("/api/auth/me"),
   login: (email: string, password: string) =>
     request<User>("/api/auth/login", {

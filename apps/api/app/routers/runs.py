@@ -19,6 +19,7 @@ from app.models import App, OrgRole, RunStatus, ScanProfile, ScanRun, Target, Ta
 from app.rate_limit import client_ip, run_limiter
 from app.schemas import RunCreate, RunOut
 from app.services.audit import write_audit
+from app.services.quota import check_scan_quota, record_scan_admission
 
 logger = logging.getLogger("straz.runs")
 router = APIRouter(tags=["runs"])
@@ -169,6 +170,14 @@ async def create_run(
     if flag and not getattr(app, flag, True):
         raise HTTPException(status_code=400, detail=f"Profile {profile.value} disabled for app")
 
+    allowed, reason = await check_scan_quota(db, org_ctx.organization, profile)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=reason,
+            headers={"X-Upgrade-Required": "true"},
+        )
+
     if profile in (ScanProfile.trivy_fs, ScanProfile.gitleaks) and not app.git_url:
         raise HTTPException(status_code=400, detail="Set git_url on the app first")
     if profile == ScanProfile.trivy_image and not app.image_ref:
@@ -189,6 +198,7 @@ async def create_run(
     )
     db.add(run)
     await db.flush()
+    await record_scan_admission(db, org_ctx.org_id)
     await write_audit(
         db,
         action="run.create",
