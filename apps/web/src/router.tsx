@@ -20,6 +20,7 @@ import { TeamPage } from "@/pages/TeamPage";
 import { BillingPage } from "@/pages/BillingPage";
 import { IntegrationsPage } from "@/pages/IntegrationsPage";
 import { ApiKeysPage } from "@/pages/ApiKeysPage";
+import { AuditLogPage } from "@/pages/AuditLogPage";
 import { InvitationPage } from "@/pages/InvitationPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -220,6 +221,16 @@ const apiKeysRoute = createRoute({
   ),
 });
 
+const auditLogsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/audit-logs",
+  component: () => (
+    <ErrorBoundary>
+      <AuditLogPage />
+    </ErrorBoundary>
+  ),
+});
+
 const invitationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invitations/$token",
@@ -241,6 +252,7 @@ const routeTree = rootRoute.addChildren([
   billingRoute,
   integrationsRoute,
   apiKeysRoute,
+  auditLogsRoute,
   invitationRoute,
 ]);
 

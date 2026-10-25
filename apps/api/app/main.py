@@ -20,10 +20,12 @@ from app.models import User
 from app.routers import (
     api_keys,
     apps,
+    audit,
     auth,
     billing,
     ci,
     findings,
+    health,
     integrations,
     organizations,
     reports,
@@ -190,6 +192,8 @@ app.include_router(runs.router, prefix="/api")
 app.include_router(findings.router, prefix="/api")
 app.include_router(api_keys.router)
 app.include_router(ci.router)
+app.include_router(audit.router)
+app.include_router(health.router)
 
 
 @app.get("/api/health")

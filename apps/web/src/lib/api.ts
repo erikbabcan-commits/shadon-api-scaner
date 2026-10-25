@@ -57,6 +57,28 @@ export type ApiKeyCreated = ApiKey & {
   warning: string;
 };
 
+export type AuditLogItem = {
+  id: string;
+  organization_id: string | null;
+  user_id: string | null;
+  actor_email: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  detail: string | null;
+  details: Record<string, any> | null;
+  created_at: string;
+};
+
+export type AuditLogListResponse = {
+  total: number;
+  items: AuditLogItem[];
+  limit: number;
+  offset: number;
+};
+
 export type ScanProfile =
   | "heartbeat"
   | "tls"
@@ -407,4 +429,23 @@ export const api = {
     request<void>(`/api/orgs/${orgId}/api-keys/${keyId}`, {
       method: "DELETE",
     }),
+  getAuditLogs: (orgId: string, params?: { action?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.action) q.set("action", params.action);
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    return request<AuditLogListResponse>(`/api/orgs/${orgId}/audit-logs${qs ? `?${qs}` : ""}`);
+  },
+  exportAuditCsvUrl: (orgId: string) => `/api/orgs/${orgId}/audit-logs/export.csv`,
+  getLiveness: () => request<{ status: string; uptime_seconds: number }>("/healthz/liveness"),
+  getReadiness: () =>
+    request<{
+      status: string;
+      ready: boolean;
+      checks: {
+        database: { status: string; latency_ms: number; error: string | null };
+        redis: { status: string; latency_ms: number; error: string | null };
+      };
+    }>("/healthz/readiness"),
 };

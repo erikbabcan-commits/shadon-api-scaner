@@ -87,7 +87,7 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
         {/* Workspace Quick Links */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 space-y-3">
           <h2 className="text-base font-semibold text-slate-200">Pracovný priestor & Nastavenia</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <a
               href="/team"
               className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-center hover:border-slate-700 transition"
@@ -115,6 +115,13 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
             >
               <div className="text-sm font-medium text-white">API Kľúče</div>
               <div className="text-[11px] text-slate-400 mt-0.5">CI/CD tokeny</div>
+            </a>
+            <a
+              href="/settings/audit-logs"
+              className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-center hover:border-slate-700 transition"
+            >
+              <div className="text-sm font-medium text-white">Audit Log</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Forenzný záznam</div>
             </a>
           </div>
         </div>
