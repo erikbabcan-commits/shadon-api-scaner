@@ -12,12 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import get_current_user
+from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
 from app.models import (
     App,
     Finding,
     FindingSeverity,
     FindingStatus,
+    OrgRole,
     RunStatus,
     ScanRun,
     User,
@@ -32,11 +33,13 @@ OVERVIEW_CACHE_KEY = "straz:cache:overview"
 OVERVIEW_CACHE_TTL = 30
 
 
-async def _invalidate_overview_cache(settings: Settings) -> None:
+async def _invalidate_overview_cache(settings: Settings, org_id: uuid.UUID | None = None) -> None:
     if settings.straz_env in ("test", "testing"):
         return
     try:
         r = aioredis.from_url(settings.redis_url, socket_timeout=1.0)
+        if org_id:
+            await r.delete(f"{OVERVIEW_CACHE_KEY}:{org_id}")
         await r.delete(OVERVIEW_CACHE_KEY)
         await r.aclose()
     except Exception:
@@ -51,10 +54,21 @@ async def list_findings(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> list[Finding]:
-    count_stmt = select(func.count()).select_from(Finding)
-    stmt = select(Finding).order_by(Finding.last_seen_at.desc())
+    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    count_stmt = (
+        select(func.count())
+        .select_from(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(org_filter)
+    )
+    stmt = (
+        select(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(org_filter)
+        .order_by(Finding.last_seen_at.desc())
+    )
 
     if status_filter:
         count_stmt = count_stmt.where(Finding.status == status_filter)
@@ -74,15 +88,43 @@ async def list_findings(
     return items
 
 
+@router.get("/findings/{finding_id}", response_model=FindingOut)
+async def get_finding(
+    finding_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
+) -> Finding:
+    stmt = (
+        select(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(
+            Finding.id == finding_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
+    finding = await db.scalar(stmt)
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    return finding
+
+
 @router.patch("/findings/{finding_id}", response_model=FindingOut)
 async def update_finding(
     finding_id: uuid.UUID,
     body: FindingUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> Finding:
-    finding = await db.get(Finding, finding_id)
+    stmt = (
+        select(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(
+            Finding.id == finding_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
+    finding = await db.scalar(stmt)
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
     finding.status = body.status
@@ -93,40 +135,47 @@ async def update_finding(
     await write_audit(
         db,
         action="finding.update",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="finding",
         entity_id=str(finding.id),
         detail=body.status.value,
     )
     await db.commit()
     await db.refresh(finding)
-    await _invalidate_overview_cache(settings)
+    await _invalidate_overview_cache(settings, org_ctx.org_id)
     return finding
 
 
 @router.get("/overview", response_model=OverviewOut)
 async def overview(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
     settings: Settings = Depends(get_settings),
 ) -> OverviewOut:
+    cache_key = f"{OVERVIEW_CACHE_KEY}:{org_ctx.org_id}"
     # 1. Check Redis cache
     try:
         r = aioredis.from_url(settings.redis_url, socket_timeout=1.0)
-        cached = await r.get(OVERVIEW_CACHE_KEY)
+        cached = await r.get(cache_key)
         await r.aclose()
         if cached:
             return OverviewOut.model_validate_json(cached)
     except Exception:
         pass
 
-    # 2. Optimized SQL aggregations (no downloading all findings into memory)
-    apps = list(await db.scalars(select(App).order_by(App.name)))
+    # 2. Optimized SQL aggregations scoped to this organization
+    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    apps = list(
+        await db.scalars(
+            select(App).where(org_filter).order_by(App.name)
+        )
+    )
 
     # Count open findings grouped by app_id
     app_finding_counts_rows = await db.execute(
         select(Finding.app_id, func.count(Finding.id))
-        .where(Finding.status == FindingStatus.open)
+        .join(App, Finding.app_id == App.id)
+        .where(Finding.status == FindingStatus.open, org_filter)
         .group_by(Finding.app_id)
     )
     counts: dict[uuid.UUID, int] = {row[0]: row[1] for row in app_finding_counts_rows}
@@ -135,7 +184,8 @@ async def overview(
     by_sev = {s.value: 0 for s in FindingSeverity}
     sev_rows = await db.execute(
         select(Finding.severity, func.count(Finding.id))
-        .where(Finding.status == FindingStatus.open)
+        .join(App, Finding.app_id == App.id)
+        .where(Finding.status == FindingStatus.open, org_filter)
         .group_by(Finding.severity)
     )
     for row in sev_rows:
@@ -146,7 +196,8 @@ async def overview(
     certs = (
         await db.scalar(
             select(func.count(Finding.id))
-            .where(Finding.status == FindingStatus.open)
+            .join(App, Finding.app_id == App.id)
+            .where(Finding.status == FindingStatus.open, org_filter)
             .where(
                 or_(
                     Finding.title.ilike("%certificate%"),
@@ -160,7 +211,13 @@ async def overview(
     # Running / queued scans count
     running = (
         await db.scalar(
-            select(func.count()).select_from(ScanRun).where(ScanRun.status.in_([RunStatus.queued, RunStatus.running]))
+            select(func.count())
+            .select_from(ScanRun)
+            .join(App, ScanRun.app_id == App.id)
+            .where(
+                ScanRun.status.in_([RunStatus.queued, RunStatus.running]),
+                org_filter,
+            )
         )
         or 0
     )
@@ -187,7 +244,7 @@ async def overview(
     # Cache overview response in Redis
     try:
         r = aioredis.from_url(settings.redis_url, socket_timeout=1.0)
-        await r.setex(OVERVIEW_CACHE_KEY, OVERVIEW_CACHE_TTL, result.model_dump_json())
+        await r.setex(cache_key, OVERVIEW_CACHE_TTL, result.model_dump_json())
         await r.aclose()
     except Exception:
         pass

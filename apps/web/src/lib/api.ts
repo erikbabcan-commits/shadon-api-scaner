@@ -1,5 +1,35 @@
 export type User = { id: string; email: string };
 
+export type OrgRole = "owner" | "admin" | "member" | "viewer";
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  role: OrgRole;
+  billing_email: string | null;
+  plan_tier: string;
+  created_at: string;
+};
+
+export type OrgMember = {
+  id: string;
+  user_id: string;
+  email: string;
+  role: OrgRole;
+  created_at: string;
+};
+
+export type OrgInvitation = {
+  id: string;
+  org_id: string;
+  email: string;
+  role: OrgRole;
+  token: string;
+  expires_at: string;
+  created_at: string;
+};
+
 export type Target = {
   id: string;
   app_id: string;
@@ -93,6 +123,27 @@ export type Overview = {
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
+let currentOrgId: string | null =
+  typeof window !== "undefined" ? localStorage.getItem("straz_org_id") : null;
+
+export function getActiveOrgId(): string | null {
+  return currentOrgId;
+}
+
+export function setActiveOrgId(orgId: string | null): void {
+  currentOrgId = orgId;
+  if (typeof window !== "undefined") {
+    if (orgId) {
+      localStorage.setItem("straz_org_id", orgId);
+    } else {
+      localStorage.removeItem("straz_org_id");
+    }
+    window.dispatchEvent(
+      new CustomEvent("straz:org-changed", { detail: { orgId } })
+    );
+  }
+}
+
 export function buildApiUrl(path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
@@ -106,6 +157,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       "Content-Type": "application/json",
       "X-Requested-With": "XMLHttpRequest",
+      ...(currentOrgId ? { "X-Organization-Id": currentOrgId } : {}),
       ...(init?.headers || {}),
     },
     ...init,
@@ -136,6 +188,33 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  getOrgs: () => request<Organization[]>("/api/orgs"),
+  createOrg: (data: { name: string; slug?: string }) =>
+    request<Organization>("/api/orgs", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getOrgMembers: (orgId: string) =>
+    request<OrgMember[]>(`/api/orgs/${orgId}/members`),
+  inviteOrgMember: (orgId: string, data: { email: string; role: OrgRole }) =>
+    request<OrgInvitation>(`/api/orgs/${orgId}/invitations`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  removeOrgMember: (orgId: string, userId: string) =>
+    request<void>(`/api/orgs/${orgId}/members/${userId}`, {
+      method: "DELETE",
+    }),
+  updateOrgMemberRole: (orgId: string, userId: string, role: OrgRole) =>
+    request<OrgMember>(`/api/orgs/${orgId}/members/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  acceptInvitation: (token: string) =>
+    request<{ status: string; org_id: string; role: OrgRole }>(
+      `/api/invitations/${token}/accept`,
+      { method: "POST" }
+    ),
   me: () => request<User>("/api/auth/me"),
   login: (email: string, password: string) =>
     request<User>("/api/auth/login", {

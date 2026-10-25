@@ -16,6 +16,8 @@ import { AppDetailPage } from "@/pages/AppDetailPage";
 import { FindingsPage } from "@/pages/FindingsPage";
 import { RunsPage } from "@/pages/RunsPage";
 import { AccountPage } from "@/pages/AccountPage";
+import { TeamPage } from "@/pages/TeamPage";
+import { InvitationPage } from "@/pages/InvitationPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function NotFound() {
@@ -175,6 +177,26 @@ const accountRoute = createRoute({
   },
 });
 
+const teamRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/team",
+  component: () => (
+    <ErrorBoundary>
+      <TeamPage />
+    </ErrorBoundary>
+  ),
+});
+
+const invitationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invitations/$token",
+  component: () => (
+    <ErrorBoundary>
+      <InvitationPage />
+    </ErrorBoundary>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   appsRoute,
@@ -182,6 +204,8 @@ const routeTree = rootRoute.addChildren([
   findingsRoute,
   runsRoute,
   accountRoute,
+  teamRoute,
+  invitationRoute,
 ]);
 
 export const router = createRouter({

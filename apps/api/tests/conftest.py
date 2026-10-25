@@ -54,6 +54,24 @@ async def test_user(db_session: AsyncSession) -> User:
         token_version=1,
     )
     db_session.add(user)
+    await db_session.flush()
+
+    from app.models import Organization, OrganizationMember, OrgRole
+    org = Organization(
+        id=uuid.uuid4(),
+        name="Test Org",
+        slug="test-org",
+    )
+    db_session.add(org)
+    await db_session.flush()
+
+    member = OrganizationMember(
+        id=uuid.uuid4(),
+        org_id=org.id,
+        user_id=user.id,
+        role=OrgRole.owner,
+    )
+    db_session.add(member)
     await db_session.commit()
     await db_session.refresh(user)
     return user

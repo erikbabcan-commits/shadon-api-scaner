@@ -9,13 +9,13 @@ from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import get_current_user
-from app.models import App, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, User
+from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
+from app.models import App, OrgRole, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, User
 from app.rate_limit import client_ip, run_limiter
 from app.schemas import RunCreate, RunOut
 from app.services.audit import write_audit
@@ -53,10 +53,21 @@ async def list_runs(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> list[ScanRun]:
-    count_stmt = select(func.count()).select_from(ScanRun)
-    stmt = select(ScanRun).order_by(ScanRun.created_at.desc())
+    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    count_stmt = (
+        select(func.count())
+        .select_from(ScanRun)
+        .join(App, ScanRun.app_id == App.id)
+        .where(org_filter)
+    )
+    stmt = (
+        select(ScanRun)
+        .join(App, ScanRun.app_id == App.id)
+        .where(org_filter)
+        .order_by(ScanRun.created_at.desc())
+    )
 
     if app_id:
         count_stmt = count_stmt.where(ScanRun.app_id == app_id)
@@ -78,13 +89,19 @@ async def stream_runs(
     request: Request,
     app_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> StreamingResponse:
     async def event_generator():
         while True:
             if await request.is_disconnected():
                 break
-            stmt = select(ScanRun).order_by(ScanRun.created_at.desc()).limit(20)
+            stmt = (
+                select(ScanRun)
+                .join(App, ScanRun.app_id == App.id)
+                .where(App.organization_id == org_ctx.org_id)
+                .order_by(ScanRun.created_at.desc())
+                .limit(20)
+            )
             if app_id:
                 stmt = stmt.where(ScanRun.app_id == app_id)
             items = list(await db.scalars(stmt))
@@ -111,9 +128,17 @@ async def stream_runs(
 async def get_run(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> ScanRun:
-    run = await db.get(ScanRun, run_id)
+    stmt = (
+        select(ScanRun)
+        .join(App, ScanRun.app_id == App.id)
+        .where(
+            ScanRun.id == run_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
+    run = await db.scalar(stmt)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
@@ -126,11 +151,16 @@ async def create_run(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> ScanRun:
-    await run_limiter.check(f"run:{client_ip(request)}:{user.id}", response=response)
-    app = await db.get(App, app_id)
+    await run_limiter.check(f"run:{client_ip(request)}:{org_ctx.user.id}", response=response)
+    app = await db.scalar(
+        select(App).where(
+            App.id == app_id,
+            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+        )
+    )
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
 
@@ -155,14 +185,14 @@ async def create_run(
         app_id=app_id,
         profile=profile,
         status=RunStatus.queued,
-        created_by=user.id,
+        created_by=org_ctx.user.id,
     )
     db.add(run)
     await db.flush()
     await write_audit(
         db,
         action="run.create",
-        user_id=user.id,
+        user_id=org_ctx.user.id,
         entity_type="scan_run",
         entity_id=str(run.id),
         detail=profile.value,

@@ -51,6 +51,13 @@ class GUID(TypeDecorator):
         return uuid.UUID(str(value))
 
 
+class OrgRole(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+    viewer = "viewer"
+
+
 class TargetStatus(str, enum.Enum):
     pending = "pending"
     verified = "verified"
@@ -112,11 +119,92 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    memberships: Mapped[list[OrganizationMember]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100))
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    billing_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+    # Billing & quotas (EPIC 2)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    plan_tier: Mapped[str] = mapped_column(String(50), default="free", server_default="free")
+    subscription_status: Mapped[str] = mapped_column(String(50), default="active", server_default="active")
+    current_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # White-label branding (EPIC 3)
+    custom_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    brand_color: Mapped[str | None] = mapped_column(String(7), default="#0284c7", server_default="#0284c7", nullable=True)
+    report_footer_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    members: Mapped[list[OrganizationMember]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    invitations: Mapped[list[OrganizationInvitation]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    apps: Mapped[list[App]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+
+
+class OrganizationMember(Base):
+    __tablename__ = "organization_members"
+    __table_args__ = (
+        UniqueConstraint("org_id", "user_id", name="uq_org_member"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[OrgRole] = mapped_column(
+        Enum(OrgRole, native_enum=False, length=16), default=OrgRole.member, server_default="member"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    organization: Mapped[Organization] = relationship(back_populates="members")
+    user: Mapped[User] = relationship(back_populates="memberships")
+
+
+class OrganizationInvitation(Base):
+    __tablename__ = "organization_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(320))
+    role: Mapped[OrgRole] = mapped_column(
+        Enum(OrgRole, native_enum=False, length=16), default=OrgRole.member, server_default="member"
+    )
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    organization: Mapped[Organization] = relationship(back_populates="invitations")
+
 
 class App(Base):
     __tablename__ = "apps"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(200))
     environment: Mapped[str] = mapped_column(String(50), default="prod")
     base_url: Mapped[str] = mapped_column(String(500))
@@ -138,6 +226,7 @@ class App(Base):
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    organization: Mapped[Organization | None] = relationship(back_populates="apps")
     targets: Mapped[list[Target]] = relationship(back_populates="app", cascade="all, delete-orphan")
     runs: Mapped[list[ScanRun]] = relationship(back_populates="app", cascade="all, delete-orphan")
     findings: Mapped[list[Finding]] = relationship(back_populates="app", cascade="all, delete-orphan")

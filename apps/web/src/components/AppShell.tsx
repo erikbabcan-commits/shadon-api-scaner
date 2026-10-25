@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useOnline } from "@/lib/useOnline";
 import { ToastContainer } from "./Toast";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 interface TabItem {
   to: "/" | "/apps" | "/findings" | "/runs" | "/account";
@@ -143,7 +144,8 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <OrganizationSwitcher />
           {runningScans > 0 && (
             <span className="sm:hidden flex items-center gap-1 text-xs text-sky-400 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
