@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api, getActiveOrgId, OrgMember, OrgRole } from "../lib/api";
+import { BrandingSettings } from "../components/BrandingSettings";
 
 export function TeamPage() {
   const [members, setMembers] = useState<OrgMember[]>([]);
@@ -215,6 +216,9 @@ export function TeamPage() {
           </div>
         )}
       </div>
+
+      {/* White-label branding section */}
+      <BrandingSettings />
     </div>
   );
 }

@@ -227,6 +227,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ return_url: returnUrl }),
     }),
+  getAppCompliance: (appId: string) =>
+    request<any>(`/api/apps/${appId}/compliance`),
+  getBranding: (orgId: string) =>
+    request<{
+      custom_logo_url: string | null;
+      brand_color: string;
+      report_footer_text: string | null;
+      white_label_enabled: boolean;
+    }>(`/api/orgs/${orgId}/branding`),
+  updateBranding: (
+    orgId: string,
+    data: { custom_logo_url?: string; brand_color?: string; report_footer_text?: string }
+  ) =>
+    request<any>(`/api/orgs/${orgId}/branding`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  getReportHtmlUrl: (appId: string) => buildApiUrl(`/api/apps/${appId}/report/html`),
   me: () => request<User>("/api/auth/me"),
   login: (email: string, password: string) =>
     request<User>("/api/auth/login", {

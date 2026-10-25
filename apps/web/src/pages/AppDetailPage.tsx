@@ -8,6 +8,7 @@ import { api, type AppItem, type ScanProfile, type Target } from "@/lib/api";
 import { formatLatency, formatTimeAgo } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { useOnline } from "@/lib/useOnline";
+import { CompliancePanel } from "@/components/CompliancePanel";
 
 const SCAN_BUTTONS: Array<[ScanProfile, string, boolean]> = [
   ["heartbeat", "Heartbeat", false],
@@ -464,6 +465,8 @@ export function AppDetailPage() {
         {app && (
           <>
             <AppHeader app={app} />
+
+            <CompliancePanel appId={appId} />
 
             <AppScansSection
               appId={appId}
