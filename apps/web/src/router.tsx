@@ -18,6 +18,7 @@ import { RunsPage } from "@/pages/RunsPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { TeamPage } from "@/pages/TeamPage";
 import { BillingPage } from "@/pages/BillingPage";
+import { IntegrationsPage } from "@/pages/IntegrationsPage";
 import { InvitationPage } from "@/pages/InvitationPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -198,6 +199,16 @@ const billingRoute = createRoute({
   ),
 });
 
+const integrationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/integrations",
+  component: () => (
+    <ErrorBoundary>
+      <IntegrationsPage />
+    </ErrorBoundary>
+  ),
+});
+
 const invitationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invitations/$token",
@@ -217,6 +228,7 @@ const routeTree = rootRoute.addChildren([
   accountRoute,
   teamRoute,
   billingRoute,
+  integrationsRoute,
   invitationRoute,
 ]);
 

@@ -15,7 +15,7 @@ PLANS = {
         "price_eur": 0,
         "max_apps": 1,
         "max_scans_per_month": 10,
-        "allowed_profiles": [ScanProfile.heartbeat, ScanProfile.internetdb],
+        "allowed_profiles": [ScanProfile.heartbeat, ScanProfile.tls, ScanProfile.internetdb],
         "cron_schedule": None,
         "white_label": False,
         "custom_webhook_hmac": False,

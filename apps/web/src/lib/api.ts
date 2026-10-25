@@ -245,6 +245,27 @@ export const api = {
       body: JSON.stringify(data),
     }),
   getReportHtmlUrl: (appId: string) => buildApiUrl(`/api/apps/${appId}/report/html`),
+  getChannels: (orgId: string) =>
+    request<any[]>(`/api/orgs/${orgId}/channels`),
+  createChannel: (orgId: string, data: any) =>
+    request<any>(`/api/orgs/${orgId}/channels`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateChannel: (orgId: string, channelId: string, data: any) =>
+    request<any>(`/api/orgs/${orgId}/channels/${channelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  deleteChannel: (orgId: string, channelId: string) =>
+    request<void>(`/api/orgs/${orgId}/channels/${channelId}`, {
+      method: "DELETE",
+    }),
+  testChannel: (orgId: string, channelId: string) =>
+    request<{ status: string; delivered: boolean }>(
+      `/api/orgs/${orgId}/channels/${channelId}/test`,
+      { method: "POST" }
+    ),
   me: () => request<User>("/api/auth/me"),
   login: (email: string, password: string) =>
     request<User>("/api/auth/login", {
