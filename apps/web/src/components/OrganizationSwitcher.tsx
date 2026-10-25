@@ -54,8 +54,6 @@ export function OrganizationSwitcher() {
     }
   }
 
-  const currentOrg = orgs.find((o) => o.id === activeId);
-
   return (
     <div className="flex items-center gap-2">
       <div className="relative">

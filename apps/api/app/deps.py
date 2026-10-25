@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import hashlib
 import uuid
 
 from fastapi import Depends, HTTPException, Request, status
@@ -10,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.models import Organization, OrganizationMember, OrgRole, User
+from app.models import ApiKey, Organization, OrganizationMember, OrgRole, User
 from app.security import read_session_token
 from app.services.organizations import ensure_user_has_org
 
@@ -20,6 +22,7 @@ class OrgContext:
     organization: Organization
     membership: OrganizationMember
     user: User
+    api_key: ApiKey | None = None
 
     @property
     def org_id(self) -> uuid.UUID:
@@ -53,10 +56,41 @@ async def get_current_user(
         auth_hdr = request.headers.get("authorization")
         if auth_hdr and auth_hdr.lower().startswith("bearer "):
             token = auth_hdr[7:].strip()
+        elif not token and request.headers.get("x-api-key"):
+            token = request.headers.get("x-api-key", "").strip()
 
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
+    # 1. Bearer API key authentication
+    if token.startswith("straz_live_"):
+        key_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        stmt = (
+            select(ApiKey)
+            .options(selectinload(ApiKey.organization), selectinload(ApiKey.user))
+            .where(ApiKey.key_hash == key_hash)
+        )
+        api_key = await db.scalar(stmt)
+        if not api_key:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+        now = datetime.now(timezone.utc)
+        if api_key.expires_at and api_key.expires_at < now:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired")
+
+        if api_key.organization.plan_tier == "free":
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="API kľúče nie sú dostupné pre bezplatný plán. Vyžaduje sa upgrade na Starter alebo vyšší.",
+            )
+
+        api_key.last_used_at = now
+        await db.commit()
+
+        request.state.api_key = api_key
+        return api_key.user
+
+    # 2. Session cookie / JWT authentication
     token_data = read_session_token(settings, token)
     if not token_data or "uid" not in token_data:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
@@ -80,6 +114,44 @@ async def get_current_org(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> OrgContext:
+    api_key: ApiKey | None = getattr(request.state, "api_key", None)
+    if api_key:
+        org_header = request.headers.get("x-organization-id")
+        if org_header:
+            try:
+                target_org_id = uuid.UUID(org_header.strip())
+                if target_org_id != api_key.organization_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="API key is not valid for the requested organization",
+                    )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid X-Organization-Id header format",
+                )
+
+        stmt = (
+            select(OrganizationMember)
+            .options(selectinload(OrganizationMember.organization))
+            .where(
+                OrganizationMember.user_id == api_key.user_id,
+                OrganizationMember.org_id == api_key.organization_id,
+            )
+        )
+        membership = await db.scalar(stmt)
+        if not membership:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key creator is no longer a member of this organization",
+            )
+        return OrgContext(
+            organization=membership.organization,
+            membership=membership,
+            user=user,
+            api_key=api_key,
+        )
+
     org_header = request.headers.get("x-organization-id")
     if org_header:
         try:
@@ -132,3 +204,20 @@ def require_org_role(min_role: OrgRole):
         return org_context
 
     return role_checker
+
+
+def require_scope(scope: str):
+    async def scope_checker(
+        org_context: OrgContext = Depends(get_current_org),
+    ) -> OrgContext:
+        if org_context.api_key:
+            scopes = org_context.api_key.scopes or []
+            if scope not in scopes:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Nedostatočné oprávnenia API kľúča",
+                )
+        return org_context
+
+    return scope_checker
+

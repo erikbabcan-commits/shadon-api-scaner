@@ -42,6 +42,21 @@ export type Target = {
   verified_at: string | null;
 };
 
+export type ApiKey = {
+  id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+};
+
+export type ApiKeyCreated = ApiKey & {
+  raw_key: string;
+  warning: string;
+};
+
 export type ScanProfile =
   | "heartbeat"
   | "tls"
@@ -378,5 +393,18 @@ export const api = {
       }),
     }).catch(() => {
       /* ignore reporting failures */
+    }),
+  listApiKeys: (orgId: string) => request<ApiKey[]>(`/api/orgs/${orgId}/api-keys`),
+  createApiKey: (
+    orgId: string,
+    data: { name: string; scopes?: string[]; expires_at?: string | null }
+  ) =>
+    request<ApiKeyCreated>(`/api/orgs/${orgId}/api-keys`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteApiKey: (orgId: string, keyId: string) =>
+    request<void>(`/api/orgs/${orgId}/api-keys/${keyId}`, {
+      method: "DELETE",
     }),
 };

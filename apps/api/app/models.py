@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     TypeDecorator,
@@ -334,6 +335,8 @@ class ScanRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by: Mapped[uuid.UUID | None] = mapped_column(GUID, nullable=True)
+    ci_fail_on: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    observations_complete: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     app: Mapped[App] = relationship(back_populates="runs")
 
@@ -378,3 +381,42 @@ class AuditEvent(Base):
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["ci:scan", "apps:read"], nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    organization: Mapped[Organization] = relationship()
+    user: Mapped[User] = relationship()
+
+
+class ScanRunFinding(Base):
+    __tablename__ = "scan_run_findings"
+
+    scan_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("scan_runs.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    finding_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("findings.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    observed_severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_new: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    scan_run: Mapped[ScanRun] = relationship()
+    finding: Mapped[Finding] = relationship()

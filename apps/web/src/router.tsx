@@ -19,6 +19,7 @@ import { AccountPage } from "@/pages/AccountPage";
 import { TeamPage } from "@/pages/TeamPage";
 import { BillingPage } from "@/pages/BillingPage";
 import { IntegrationsPage } from "@/pages/IntegrationsPage";
+import { ApiKeysPage } from "@/pages/ApiKeysPage";
 import { InvitationPage } from "@/pages/InvitationPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -209,6 +210,16 @@ const integrationsRoute = createRoute({
   ),
 });
 
+const apiKeysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/api-keys",
+  component: () => (
+    <ErrorBoundary>
+      <ApiKeysPage />
+    </ErrorBoundary>
+  ),
+});
+
 const invitationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invitations/$token",
@@ -229,6 +240,7 @@ const routeTree = rootRoute.addChildren([
   teamRoute,
   billingRoute,
   integrationsRoute,
+  apiKeysRoute,
   invitationRoute,
 ]);
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { api } from "../lib/api";
 
 export function InvitationPage() {
@@ -15,7 +15,7 @@ export function InvitationPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.acceptInvitation(token);
+      await api.acceptInvitation(token);
       setSuccess(true);
       setTimeout(() => {
         window.location.href = "/";

@@ -20,6 +20,7 @@ PLANS = {
         "white_label": False,
         "custom_webhook_hmac": False,
         "max_alert_channels": 1,
+        "max_api_keys": 0,
     },
     "starter": {
         "name": "Starter",
@@ -39,6 +40,7 @@ PLANS = {
         "white_label": False,
         "custom_webhook_hmac": False,
         "max_alert_channels": 3,
+        "max_api_keys": 2,
     },
     "pro": {
         "name": "Pro",
@@ -50,6 +52,7 @@ PLANS = {
         "white_label": True,
         "custom_webhook_hmac": True,
         "max_alert_channels": 9999,
+        "max_api_keys": 999999,
     },
     "agency": {
         "name": "Agency",
@@ -61,6 +64,7 @@ PLANS = {
         "white_label": True,
         "custom_webhook_hmac": True,
         "max_alert_channels": 9999,
+        "max_api_keys": 999999,
     },
 }
 
@@ -211,3 +215,27 @@ async def get_org_usage_stats(db: AsyncSession, org: Organization) -> dict[str, 
         "allowed_profiles": [p.value for p in plan["allowed_profiles"]],
         "white_label": plan["white_label"],
     }
+
+
+async def check_api_key_limit(db: AsyncSession, org: Organization) -> tuple[bool, str]:
+    from app.models import ApiKey
+
+    plan = get_plan_config(org)
+    limit = plan.get("max_api_keys", 0)
+
+    count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(ApiKey)
+            .where(ApiKey.organization_id == org.id)
+        )
+        or 0
+    )
+
+    if count >= limit:
+        return (
+            False,
+            f"Dosiahli ste limit API kľúčov pre plán {plan['name']} (max {limit}). Vyžaduje sa upgrade na vyšší balík.",
+        )
+    return True, ""
+

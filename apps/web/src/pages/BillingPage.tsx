@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
 export function BillingPage() {
   const [plans, setPlans] = useState<Record<string, any>>({});
   const [usage, setUsage] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -12,7 +11,6 @@ export function BillingPage() {
   }, []);
 
   async function loadBilling() {
-    setLoading(true);
     try {
       const [pData, uData] = await Promise.all([
         api.getPlans(),
@@ -22,8 +20,6 @@ export function BillingPage() {
       setUsage(uData);
     } catch {
       /* ignore */
-    } finally {
-      setLoading(false);
     }
   }
 
