@@ -206,7 +206,7 @@ export function AppShell({
 
       <nav
         aria-label="Hlavná navigácia"
-        className="tabbar fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-lg border-t border-slate-800/90 flex justify-around py-2 px-1 md:py-2.5 max-w-lg md:max-w-xl mx-auto md:bottom-3 md:rounded-2xl md:border shadow-2xl shadow-black/80"
+        className="tabbar fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/90 flex justify-around pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-1 md:py-2.5 max-w-lg md:max-w-xl mx-auto md:bottom-3 md:rounded-2xl md:border shadow-2xl shadow-black/80"
       >
         {tabs.map((tab) => {
           const active =
