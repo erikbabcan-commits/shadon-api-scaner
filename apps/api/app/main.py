@@ -63,6 +63,9 @@ async def bootstrap_admin() -> None:
             select(User).where(User.email == settings.straz_admin_email.lower())
         )
         if existing:
+            from app.security import verify_password
+            if not verify_password(existing.password_hash, settings.straz_admin_password):
+                existing.password_hash = hash_password(settings.straz_admin_password)
             from app.services.organizations import ensure_user_has_org
             await ensure_user_has_org(db, existing)
             await db.commit()
