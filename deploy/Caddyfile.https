@@ -5,6 +5,10 @@
 {$STRAZ_DOMAIN:localhost} {
 	encode gzip
 
+	handle /healthz/* {
+		reverse_proxy api:8000
+	}
+
 	handle /api/* {
 		reverse_proxy api:8000
 	}

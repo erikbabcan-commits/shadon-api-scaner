@@ -36,8 +36,8 @@ services:
   - type: worker
     name: straz-worker
     env: docker
-    dockerfilePath: ./deploy/worker.Dockerfile
-    dockerContext: .
+    dockerfilePath: ./apps/api/worker.Dockerfile
+    dockerContext: ./apps/api
     plan: starter
     envVars:
       - key: STRAZ_ENV

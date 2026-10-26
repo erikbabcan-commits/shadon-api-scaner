@@ -44,4 +44,10 @@ ENV PYTHONPATH=/app
 
 RUN nuclei -update-templates || true
 
+# Run as unprivileged non-root user (H15 compliance)
+RUN useradd -u 10001 -m -d /home/straz -s /bin/bash straz && \
+    chown -R straz:straz /app /opt/pd /opt/scanners /home/straz
+
+USER straz
+
 CMD ["arq", "app.worker.WorkerSettings"]

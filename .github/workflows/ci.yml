@@ -95,11 +95,12 @@ jobs:
         run: |
           npm ci --ignore-scripts
 
-      - name: Build frontend application
+      - name: Build and test frontend application
         working-directory: ./apps/web
         env:
           VITE_API_URL: https://api.straz.example.com
         run: |
+          npm test
           npm run build
           npx --no-install tsc --noEmit
 
