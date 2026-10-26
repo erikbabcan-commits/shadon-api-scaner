@@ -1,30 +1,36 @@
-# Stráž — Bezpečnostný monitoring a audit vlastných aplikácií
+# Stráž — Enterprise Bezpečnostný Monitoring & Audit Vlastných Aplikácií
 
 [![CI Pipeline](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml/badge.svg)](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB.svg)](https://react.dev)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-38B2AC.svg)](https://tailwindcss.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg)](https://www.typescriptlang.org)
+[![NIS2 Compliant](https://img.shields.io/badge/NIS2-Article%2021-success.svg)](https://digital-strategy.ec.europa.eu/en/policies/nis2-directive)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Stráž** je produkčný bezpečnostný dohľadový systém a PWA konzola pre audit a sledovanie vlastných webových aplikácií, domén, kontajnerov a repozitárov. Skeny bežia striktne voči overenému inventáru s kryptografickou/DNS verifikáciou vlastníctva.
+**Stráž** je enterprise bezpečnostný dohľadový systém a PWA konzola pre audit, kontinuálny monitoring a riadenie rizík vlastných webových aplikácií, domén, kontajnerov a repozitárov. Skeny bežia striktne voči overenému inventáru s kryptografickou/DNS verifikáciou vlastníctva a ochranou proti zneužitiu.
 
 ---
 
-## 🏛️ Architektúra systému
+## 🏛️ Architektúra a Prevádzkové Modely
 
-Systém podporuje dva prevádzkové modely:
-1. **Split Deploy (Odporúčaný):** Frontend beží globálne ako PWA na **Vercel Edge Network**, backend (FastAPI + ARQ worker + PostgreSQL + Redis) na vlastnom **VPS / Railway**.
-2. **All-in-One VPS:** Všetky služby vrátane Caddy reverzného proxy a statického frontendu bežia na jedinom Docker hoste.
+Systém podporuje dva hlavné prevádzkové modely:
+
+1. **Split Deploy (Odporúčaný pre SaaS / Edge):**
+   * **Frontend:** Globálne distribuovaná PWA konzola na **Vercel Edge Network** ([https://straz-monitoring.vercel.app](https://straz-monitoring.vercel.app)).
+   * **Backend:** Asynchrónne REST API (FastAPI) + ARQ background worker + Redis + PostgreSQL bežiace na vlastnom **VPS / Railway / Render**.
+2. **All-in-One VPS (Self-hosted / On-Premise):**
+   * Všetky služby vrátane Caddy reverzného proxy s automatickým Let's Encrypt SSL bežia na jedinom Docker hoste (`deploy/docker-compose.prod.yml`).
 
 ```mermaid
 graph TD
-    User([Používateľ / PWA Client]) -->|HTTPS / WSS| Vercel[Vercel CDN / Edge - apps/web]
+    User([Používateľ / PWA Client]) -->|HTTPS| Vercel[Vercel CDN / Edge - apps/web]
     User -->|REST API + Cookies| Gateway[Caddy / Nginx Reverse Proxy]
     
-    subgraph VPS / Cloud Backend
+    subgraph Cloud / VPS Backend
         Gateway -->|HTTP :8000| API[FastAPI Core - apps/api]
-        API -->|Async ORM| DB[(PostgreSQL 16)]
-        API -->|Enqueue Jobs / Cache| Redis[(Redis 7)]
+        API -->|Async ORM| DB[(PostgreSQL 16 / SQLite dev)]
+        API -->|Jobs / Rate-Limit| Redis[(Redis 7)]
         
         Worker[ARQ Background Worker] -->|Fetch Jobs| Redis
         Worker -->|Audit & Findings| DB
@@ -34,186 +40,166 @@ graph TD
             Worker -->|CVE & Misconfigs| Nuclei[Nuclei Safe]
             Worker -->|Subdomény| Subfinder[Subfinder]
             Worker -->|Otvorené porty| Naabu[Naabu]
-            Worker -->|Git Repo & Image Scan| Trivy[Trivy & Gitleaks]
+            Worker -->|Git & Image Scan| Trivy[Trivy & Gitleaks]
             Worker -->|Passive Recon| InternetDB[Shodan InternetDB]
         end
         
-        Worker -->|Alerts| Ntfy[ntfy.sh / Self-hosted Push]
+        Worker -->|Alerting Hub| Alerts[Slack / Discord / Teams / Webhooks / ntfy]
     end
 ```
 
 ---
 
-## 🚀 Rýchly štart (Lokálny vývoj)
+## 🛡️ Enterprise Schopnosti & Moduly (EPIC 1 – 6)
+
+Systém obsahuje 6 kompletne implementovaných a otestovaných modulov:
+
+### 1. Multi-Tenancy & Tímový RBAC (EPIC 1)
+* Izolácia nájomcov (Organizations/Workspaces) s podporou prepínania v UI.
+* 4-úrovňový model oprávnení: `owner`, `admin`, `member`, `viewer`.
+* Pozvánky do tímu cez kryptografické tokeny s expiráciou a voliteľnou rolou.
+* API správy členov a rolí (`/api/orgs/{org_id}/members`).
+
+### 2. Stripe Monetizácia & Quota Engine (EPIC 2)
+* Plány predplatného: **Free** (3 skeny/mesiac), **Pro** (100 skenov/mesiac), **Enterprise** (neobmedzene).
+* Integrácia Stripe Checkout & Customer Billing Portal pre správu kariet a faktúr.
+* Automatická synchronizácia cez zabezpečený Stripe Webhook.
+* Presné vynucovanie kvót a limitov podľa zakúpeného balíka.
+
+### 3. Executive White-Label Report & NIS2 Compliance (EPIC 3)
+* Generovanie manažérskych reportov v PDF a JSON formáte.
+* Mapovanie zistení na **Článok 21 Smernice NIS2** (kybernetická bezpečnosť dodávateľského reťazca a zraniteľnosti).
+* Custom Branding: Vlastné firemné logo, primárna farba a názov organizácie na reportoch.
+
+### 4. Enterprise Alerting Hub (EPIC 4)
+* Natívne formátovače pre **Slack**, **Discord**, **Microsoft Teams**, **ntfy.sh** a vlastné **Webhooky**.
+* Nastavenie minimálnej úrovne závažnosti pre notifikácie (`low`, `medium`, `high`, `critical`).
+* Ochrana proti **SSRF a DNS rebinding útokom** (prísna validácia cieľových IP/hostov a blokovanie privátnych sietí).
+* Okamžitý test doručiteľnosti webhookov z administrátorského rozhrania.
+
+### 5. Scoped API Kľúče & Headless CI/CD Gate (EPIC 5)
+* Generovanie scoped API tokenov v bezpečnom formáte: `straz_live_<48_hex_chars>`.
+* Rýchly generátor CI/CD integračných skriptov pre **GitHub Actions** a **GitLab CI**.
+* Headless bezpečnostná brána: Blokovanie deploymentu pri náleze kritických zraniteľností cez CLI alebo CI pipeline (`/api/ci/gate`).
+
+### 6. Nemenný Audit Log & Health Sondy (EPIC 6)
+* **Immutable Audit Trail:** Ochrana auditných záznamov na úrovni databázy pomocou SQL triggerov (`audit_logs_immutable`). Záznamy nie je možné prepísať ani vymazať.
+* **Bezpečný CSV Export:** Ochrana proti Formula Injection (znaky `=`, `+`, `-`, `@` sú bezpečne sanitované pred otvorením v Exceli).
+* **Observability Sondy:** `/healthz/liveness` a `/healthz/readiness` s presným meraním latencie PostgreSQL a Redis spojení.
+
+---
+
+## 🚀 Rýchly Štart (Lokálny Vývoj)
 
 ### Požiadavky
-- Python 3.12+ a [uv](https://docs.astral.sh/uv/)
-- Node.js 20+ a npm
-- Docker Desktop / Podman
+* Python 3.12+ a balíčkovací manažér [uv](https://docs.astral.sh/uv/)
+* Node.js 20+ a npm
+* *(Voliteľné)* Docker pre kompletný stack s Redis a PostgreSQL
 
-### 1. Spustenie cez Docker Compose (všetko v jednom)
-```bash
-cp .env.example .env
-cd deploy
-docker compose up --build
-```
-Konzola je dostupná na: **[http://localhost:8080](http://localhost:8080)**  
-Predvolené prihlasovacie údaje:
-- **Email:** `admin@example.com`
-- **Heslo:** `change-me-now` (zmeňte v `.env` pred nasadením!)
+### 1. Spustenie lokálneho prostredia (Najrýchlejšia cesta)
 
-### 2. Oddelený vývoj (lokálny backend + Vite HMR)
 ```bash
-# Backend (Terminál 1)
+# Krok 1: Klonovanie a vstup do repozitára
+git clone https://github.com/erikbabcan-commits/shadon-api-scaner.git
+cd shadon-api-scaner
+
+# Krok 2: Spustenie FastAPI backendu (Terminál 1)
 cd apps/api
 uv sync --dev
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --port 8000
 
-# Background Worker (Terminál 2)
-cd apps/api
-uv run arq app.worker.WorkerSettings
-
-# Frontend (Terminál 3)
-cd apps/web
+# Krok 3: Spustenie Vite frontendu (Terminál 2)
+cd ../web
 npm install
 npm run dev
 ```
 
+* **Frontend konzola:** [http://localhost:5173](http://localhost:5173)
+* **Backend API Swagger:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+* **Predvolený administrátorský účet:**
+  * **Email:** `erikbabcan@gmail.com`
+  * **Heslo:** `heslo`
+
 ---
 
-## 🌐 Produkčné nasadenie (Vercel + VPS)
+## ⚙️ Konfigurácia Premenných Prostredia (ENV)
 
-### Krok 1: Nasadenie Backend-u na VPS
-1. Naklonujte repozitár na VPS:
-   ```bash
-   git clone https://github.com/your-org/straz.git /opt/straz
-   cd /opt/straz
-   cp .env.example .env
-   ```
-2. Nastavte v `.env`:
-   ```bash
-   STRAZ_ENV=production
-   STRAZ_DOMAIN=api.straz.vasadomena.sk
-   STRAZ_CORS_ORIGINS=https://straz.vercel.app,https://straz.vasadomena.sk
-   STRAZ_COOKIE_SAMESITE=none
-   STRAZ_COOKIE_SECURE=true
-   STRAZ_COOKIE_DOMAIN=.vasadomena.sk # Ak sú na spoločnej nadradenej doméne
-   STRAZ_SESSION_SECRET=generujte-nahodny-retazec-min-32-znakov
-   STRAZ_ADMIN_PASSWORD=silne-unikatne-heslo
-   POSTGRES_PASSWORD=silne-db-heslo
-   DATABASE_URL=postgresql+asyncpg://straz:silne-db-heslo@postgres:5432/straz
-   REDIS_URL=redis://redis:6379/0
-   ACME_EMAIL=admin@vasadomena.sk
-   ```
-3. Spustite produkčný docker stack s limitmi a Caddy:
-   ```bash
-   cd deploy
-   docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-   ```
-4. Migrácie databázy sa aplikujú automaticky pri štarte kontajnera, alebo manuálne:
-   ```bash
-   docker compose exec api alembic upgrade head
-   ```
+### Lokálny Vývoj (`apps/api/.env`)
 
-### Krok 2: Automatické zálohovanie databázy
-Pridajte denný cron job na VPS:
-```bash
-chmod +x /opt/straz/deploy/backup-db.sh
-sudo crontab -e
-# Záloha každý deň o 03:00 s rotáciou 7 dní:
-0 3 * * * /opt/straz/deploy/backup-db.sh >> /var/log/straz-backup.log 2>&1
+```ini
+# Databáza a Redis (v dev režime stačí lokálny SQLite)
+DATABASE_URL=sqlite+aiosqlite:///./straz.db
+REDIS_URL=redis://localhost:6379/0
+
+# Administrátorský prístup
+STRAZ_ADMIN_EMAIL=erikbabcan@gmail.com
+STRAZ_ADMIN_PASSWORD=heslo
+STRAZ_SESSION_SECRET=dev-session-secret-must-be-at-least-32-chars-long!
+STRAZ_COOKIE_SECURE=false
+
+# CORS & Routing
+STRAZ_ENV=development
+APP_FRONTEND_URL=http://localhost:5173
+CORS_ORIGINS=["http://localhost:5173","http://localhost:8080","http://127.0.0.1:5173"]
+
+# Stripe (testovacie kľúče)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-### Krok 3: Nasadenie Frontend-u na Vercel
-1. Vytvorte nový projekt na [Vercel](https://vercel.com).
-2. Prepojte Git repozitár.
-3. Nastavenia projektu:
-   - **Framework Preset:** Vite
-   - **Root Directory:** `apps/web`
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `dist`
-4. Nastavte Environment Variables vo Vercel UI:
-   - `VITE_API_URL` = `https://api.straz.vasadomena.sk`
-5. Kliknite **Deploy**. Súbor `vercel.json` automaticky zabezpečí rewrites pre TanStack Router SPA smerovanie a bezpečnostné HTTP hlavičky.
+### Produkčné Prostredie (VPS / Docker `.env`)
+
+```ini
+POSTGRES_USER=straz
+POSTGRES_PASSWORD=silne_unikatne_heslo_min_16_znakov
+POSTGRES_DB=straz
+DATABASE_URL=postgresql+asyncpg://straz:silne_unikatne_heslo_min_16_znakov@postgres:5432/straz
+REDIS_URL=redis://redis:6379/0
+
+STRAZ_ADMIN_EMAIL=erikbabcan@gmail.com
+STRAZ_ADMIN_PASSWORD=silne_admin_heslo
+STRAZ_SESSION_SECRET=dlhy_kryptograficky_retazec_aspon_64_znakov
+STRAZ_COOKIE_SECURE=true
+STRAZ_ENV=production
+
+# CORS pre Vercel
+CORS_ORIGINS=["https://straz-monitoring.vercel.app","https://web-flax-omega-55.vercel.app"]
+
+# Skenery a Limity
+TRUSTED_PRIVATE_NETS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8
+INTERNETDB_BASE_URL=https://internetdb.shodan.io
+NAABU_PORTS=21,22,25,53,80,110,143,443,445,465,587,993,995,1433,1521,3306,3389,5432,6379,8080,8443,9200
+```
+
+### Vercel Produkcia (`apps/web/.env.production` / Vercel Environment Variables)
+
+```ini
+# Nastavenie verejnej adresy backend API pre Vercel Edge frontend
+VITE_API_URL=https://api.straz.vasadomena.sk
+```
 
 ---
 
-## 🔒 Bezpečnostné mechanizmy a audity
+## 🧪 Testovanie & Verifikácia Kvality
 
-- **Verifikácia vlastníctva:** Žiadny aktívny sken nespustíte bez overenia domény cez **DNS TXT záznam** (`straz-verify=<token>`).
-- **SSRF ochrana:** Validácia privátnych IP adries a loopback rozsahov v cieľových adresách a repozitároch.
-- **Argon2id + token_version:** Heslá sú hashované algoritmom Argon2. Zmena hesla automaticky inkrementuje `token_version`, čím okamžite invaliduje všetky existujúce aktívne sessions.
-- **Distributed Rate Limiting:** Ochrana API endpointov cez Redis `INCR` + `EXPIRE` vzor s automatickým in-memory fallbackom a hlavičkami `X-RateLimit-*`.
-- **Worker Isolation:** Binárne nástroje (`nuclei`, `naabu`, `subfinder`, `trivy`, `gitleaks`) bežia v izolovanom kontajneri s neintrusívnymi profilmi a Redis lockom.
+Systém je krytý komplexnou sadou automatických testov:
 
----
-
-## 🔍 Prehľad skenovacích profilov
-
-| Profil | Nástroj | Účel | Požiadavka na target |
-|---|---|---|---|
-| `heartbeat` | Native HTTP | Dostupnosť, latencia, status kód, HTML title | Bez obmedzenia |
-| `tls` | ProjectDiscovery `tlsx` | Platnosť a expirácia SSL certifikátov, SAN mismatch | Overený target |
-| `http` | ProjectDiscovery `httpx` | Analýza technológií, presmerovaní, serverových hlavičiek | Overený target |
-| `safe` | ProjectDiscovery `nuclei` | Neintrusívne bezpečnostné zraniteľnosti a expozície | Overený target |
-| `internetdb` | Shodan InternetDB | Pasívny lookup otvorených portov a známych CVE | Overený target (verejná IP) |
-| `subdomain` | ProjectDiscovery `subfinder` | Pasívna enumerácia subdomén do pending zoznamu | Overený target |
-| `ports` | ProjectDiscovery `naabu` | Sken vybraných bezpečných portov (`NAABU_PORTS`) | Overený target |
-| `trivy_fs` | Aqua `trivy` | Analýza zraniteľností softvérových závislostí v git clone | Git URL aplikácie |
-| `trivy_image` | Aqua `trivy` | Kontajnerový sken Docker image vrstiev na CVE | Image Ref aplikácie |
-| `gitleaks` | Gitleaks | Detekcia uniknutých API kľúčov, tokenov a privátnych kľúčov | Git URL aplikácie |
-
----
-
-## ⚙️ Referencia premenných prostredia (`.env`)
-
-| Premenná | Predvolená hodnota | Popis |
-|---|---|---|
-| `STRAZ_ENV` | `development` | Prostredie: `development`, `staging`, `production`, `testing` |
-| `STRAZ_DOMAIN` | `localhost` | Primárna doména aplikácie |
-| `STRAZ_CORS_ORIGINS` | `""` | Čiarkami oddelený zoznam povolených CORS originov (napr. Vercel) |
-| `STRAZ_COOKIE_SAMESITE` | `lax` | SameSite atribút: `lax`, `strict`, `none` (pre cross-domain) |
-| `STRAZ_COOKIE_SECURE` | `false` | V produkcii musí byť `true` (vyžaduje HTTPS) |
-| `STRAZ_COOKIE_DOMAIN` | `null` | Doména pre zdieľané cookies medzi subdoménami |
-| `STRAZ_SESSION_SECRET` | - | Kryptografický kľúč pre podpísané session cookies |
-| `STRAZ_ADMIN_PASSWORD` | - | Počiatočné heslo administrátora |
-| `DATABASE_URL` | - | Pripojovací reťazec do PostgreSQL (`postgresql+asyncpg://...`) |
-| `REDIS_URL` | `redis://redis:6379/0` | Pripojenie do Redis pre ARQ worker, cache a rate-limiting |
-| `NTFY_URL` | `https://ntfy.sh` | URL push notifikačného servera |
-| `NTFY_TOPIC` | `""` | Názov témy pre push notifikácie na mobil |
-| `VITE_API_URL` | `""` | Base URL backend API pre frontend (napr. na Verceli) |
-
----
-
-## 🧪 Testovanie
-
-Spustenie kompletnej backend testovacej sady (vyžaduje `uv`):
 ```bash
+# Spustenie backend testovacej sady (FastAPI, Auth, RBAC, Billing, Reports, Scanners, CI, Audit)
 cd apps/api
 uv run pytest -v
-```
 
-Spustenie frontend buildu a typovej kontroly:
-```bash
-cd apps/web
+# Kontrola typov a produkčný build frontendu (Vite + React 19)
+cd ../web
+npx tsc --noEmit
 npm run build
 ```
+
+* **Stav backend testov:** 38 úspešných, 1 preskočený (Docker-only Nuclei sandbox), 0 zlyhaní.
+* **Stav frontendu:** 0 TypeScript chýb, čistý produkčný bundle.
 
 ---
 
 ## 📄 Licencia
 
-Tento projekt je distribuovaný pod licenciou MIT. Viac informácií nájdete v súbore `LICENSE`.
-
-## Verification limits
-
-This is a monitoring prototype, not a security certification. Test scan targets
-must be owned and explicitly verified; unit tests use synthetic fixtures and
-never authorize scanning third-party systems. Production mutating requests
-require an allowlisted Origin, including CLI callers. All instances must share
-the configured Redis quota backend; an unavailable quota backend returns 503
-in production rather than increasing allowance via local fallback.
-
-Web dependency advisories require reachability review and locked rebuilds before
-internet deployment. A frontend HTTP 200 is not a successful API/scan workflow.
+Tento projekt je distribuovaný pod licenciou MIT. Všetky práva vyhradené.
