@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     app_frontend_url: str = "http://localhost:5173"
 
     @property
+    def normalized_database_url(self) -> str:
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
+    @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.straz_cors_origins.split(",") if o.strip()]
 
