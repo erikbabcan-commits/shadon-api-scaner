@@ -65,6 +65,22 @@
   ],
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://straz-api-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/healthz/:path*",
+      "destination": "https://straz-api-production.up.railway.app/healthz/:path*"
+    },
+    {
+      "source": "/docs",
+      "destination": "https://straz-api-production.up.railway.app/docs"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "https://straz-api-production.up.railway.app/openapi.json"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -158,7 +158,13 @@ export type Overview = {
   running_scans: number;
 };
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+const envApiUrl = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+// In browser environments on Vercel, prefer relative paths ("")
+// to leverage reverse proxy rewrites and ensure first-party cookie compatibility across iOS Safari / WebKit.
+const API_BASE_URL =
+  typeof window !== "undefined" && window.location.hostname.endsWith("vercel.app")
+    ? ""
+    : envApiUrl;
 
 let currentOrgId: string | null =
   typeof window !== "undefined" ? localStorage.getItem("straz_org_id") : null;
