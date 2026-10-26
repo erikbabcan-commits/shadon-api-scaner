@@ -12,7 +12,7 @@ class Base(DeclarativeBase):
 
 settings = get_settings()
 engine_kwargs: dict = {"pool_pre_ping": True}
-if "sqlite" not in settings.database_url:
+if "sqlite" not in settings.normalized_database_url:
     engine_kwargs.update(
         {
             "pool_size": 10,
@@ -22,7 +22,7 @@ if "sqlite" not in settings.database_url:
         }
     )
 
-engine = create_async_engine(settings.database_url, **engine_kwargs)
+engine = create_async_engine(settings.normalized_database_url, **engine_kwargs)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 

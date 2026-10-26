@@ -1,0 +1,64 @@
+services:
+  # 1. FastAPI Core Web Service
+  - type: web
+    name: straz-api
+    env: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: STRAZ_ENV
+        value: production
+      - key: STRAZ_COOKIE_SECURE
+        value: "true"
+      - key: STRAZ_COOKIE_SAMESITE
+        value: "none"
+      - key: STRAZ_ADMIN_EMAIL
+        value: erikbabcan@gmail.com
+      - key: STRAZ_ADMIN_PASSWORD
+        generateValue: true
+      - key: STRAZ_SESSION_SECRET
+        generateValue: true
+      - key: STRAZ_CORS_ORIGINS
+        value: "https://straz-monitoring.vercel.app,https://web-flax-omega-55.vercel.app"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: straz-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: straz-redis
+          property: connectionString
+
+  # 2. Asynchronous Scanning Background Worker
+  - type: worker
+    name: straz-worker
+    env: docker
+    dockerfilePath: ./deploy/worker.Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: STRAZ_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: straz-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: straz-redis
+          property: connectionString
+
+databases:
+  - name: straz-postgres
+    plan: starter
+    databaseName: straz
+    user: straz
+
+redis:
+  - name: straz-redis
+    plan: starter
+    maxmemoryPolicy: noeviction
