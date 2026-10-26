@@ -3,12 +3,12 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
+from app.deps import OrgContext, get_current_user, require_org_role
 from app.models import OrgRole, User
 from app.services import organizations as org_service
 from app.services.audit import write_audit
@@ -54,7 +54,9 @@ async def create_organization(
         entity_type="organization",
         entity_id=str(org.id),
         detail=org.name,
+        org_id=org.id,
     )
+    await db.commit()
     return {
         "id": org.id,
         "name": org.name,
@@ -105,6 +107,7 @@ async def invite_member(
         entity_id=str(invitation.id),
         detail=f"Invited {body.email} as {body.role.value}",
     )
+    await db.commit()
     return {
         "id": invitation.id,
         "org_id": invitation.org_id,
@@ -142,6 +145,7 @@ async def remove_member(
         entity_id=str(user_id),
         detail=f"Removed member {user_id}",
     )
+    await db.commit()
 
 
 @router.patch("/orgs/{org_id}/members/{user_id}")
@@ -172,6 +176,7 @@ async def update_member_role(
         entity_id=str(user_id),
         detail=f"Changed role to {body.role.value}",
     )
+    await db.commit()
     return {
         "id": member.id,
         "user_id": member.user_id,
@@ -193,7 +198,9 @@ async def accept_invitation(
         entity_type="organization",
         entity_id=str(member.org_id),
         detail=f"Joined organization with role {member.role.value}",
+        org_id=member.org_id,
     )
+    await db.commit()
     return {
         "status": "accepted",
         "org_id": member.org_id,

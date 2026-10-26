@@ -7,10 +7,14 @@ from app.models import App, Finding, FindingSeverity, FindingStatus, FindingSour
 
 
 @pytest.mark.asyncio
-async def test_findings_crud_and_overview(auth_client: AsyncClient, db_session: AsyncSession):
+async def test_findings_crud_and_overview(auth_client: AsyncClient, db_session: AsyncSession, test_user):
+    from sqlalchemy import select
+    from app.models import OrganizationMember
+    org_id = await db_session.scalar(select(OrganizationMember.org_id).where(OrganizationMember.user_id == test_user.id))
     # Setup test app
     app = App(
         id=uuid.uuid4(),
+        organization_id=org_id,
         name="Security Target",
         base_url="https://sec.example.com",
     )

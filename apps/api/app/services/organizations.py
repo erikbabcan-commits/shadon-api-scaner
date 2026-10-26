@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import (
-    App,
     Organization,
     OrganizationInvitation,
     OrganizationMember,
@@ -104,6 +103,8 @@ async def ensure_user_has_org(db: AsyncSession, user: User) -> tuple[Organizatio
         OrganizationMember.org_id == org.id, OrganizationMember.user_id == user.id
     )
     membership = await db.scalar(stmt)
+    if membership is None:
+        raise RuntimeError("Default organization membership was not persisted")
     return org, membership
 
 
@@ -190,7 +191,7 @@ async def accept_invitation(
     stmt = (
         select(OrganizationInvitation)
         .options(selectinload(OrganizationInvitation.organization))
-        .where(OrganizationInvitation.token == token)
+        .where(OrganizationInvitation.token == token).with_for_update()
     )
     invitation = await db.scalar(stmt)
     if not invitation:
@@ -215,7 +216,7 @@ async def accept_invitation(
     if user.email.strip().lower() != invitation.email.strip().lower():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"This invitation was sent to {invitation.email}, but you are logged in as {user.email}.",
+            detail="Invitation does not belong to this account.",
         )
 
     # Check if already member
@@ -292,6 +293,8 @@ async def update_member_role(
             detail="Member not found.",
         )
 
+    if new_role == OrgRole.owner:
+        raise HTTPException(status_code=403, detail="Ownership transfer requires a separate workflow")
     if member.role == OrgRole.owner:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

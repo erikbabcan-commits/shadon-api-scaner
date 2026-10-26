@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,6 +65,7 @@ async def checkout(
         entity_id=str(org_ctx.org_id),
         detail=f"Created checkout session for plan {body.tier}",
     )
+    await db.commit()
     return session
 
 
@@ -89,6 +90,7 @@ async def customer_portal(
         entity_id=str(org_ctx.org_id),
         detail="Opened customer billing portal",
     )
+    await db.commit()
     return session
 
 
@@ -99,5 +101,11 @@ async def stripe_webhook(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
-    body_bytes = await request.body()
-    return await handle_stripe_webhook(db, body_bytes, stripe_signature, settings)
+    body_bytes = b""
+    async for chunk in request.stream():
+        body_bytes += chunk
+        if len(body_bytes) > 1_000_000:
+            raise HTTPException(status_code=413, detail="Webhook body too large")
+    result = await handle_stripe_webhook(db, body_bytes, stripe_signature, settings)
+    await db.commit()
+    return result

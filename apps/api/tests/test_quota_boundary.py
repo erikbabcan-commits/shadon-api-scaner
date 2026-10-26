@@ -19,7 +19,7 @@ async def test_memory_limit_allows_exact_budget():
 @pytest.mark.asyncio
 async def test_production_does_not_fallback_to_per_instance_budget(monkeypatch):
     monkeypatch.setattr(rate_limit, "get_settings", lambda: SimpleNamespace(straz_env="production", is_production=True))
-    redis = SimpleNamespace(eval=AsyncMock(side_effect=aioredis.RedisError("synthetic outage")))
+    redis = SimpleNamespace(execute_command=AsyncMock(side_effect=aioredis.RedisError("synthetic outage")))
     monkeypatch.setattr(rate_limit, "get_redis_client", lambda: redis)
     with pytest.raises(HTTPException) as exc:
         await RateLimiter(2, 60).check("fixture")
@@ -30,12 +30,12 @@ async def test_production_does_not_fallback_to_per_instance_budget(monkeypatch):
 async def test_independent_instances_share_counter(monkeypatch):
     monkeypatch.setattr(rate_limit, "get_settings", lambda: SimpleNamespace(straz_env="production", is_production=True))
     count = 0
-    async def evaluate(script, numkeys, key, window):
+    async def evaluate(command, script, numkeys, key, window):
         nonlocal count
-        assert "EXPIRE" in script and numkeys == 1
+        assert command == "EVAL" and "EXPIRE" in script and numkeys == 1
         count += 1
         return [count, window]
-    monkeypatch.setattr(rate_limit, "get_redis_client", lambda: SimpleNamespace(eval=evaluate))
+    monkeypatch.setattr(rate_limit, "get_redis_client", lambda: SimpleNamespace(execute_command=evaluate))
     first, second = RateLimiter(2, 60), RateLimiter(2, 60)
     await first.check("fixture"); await second.check("fixture")
     with pytest.raises(HTTPException) as exc:
@@ -46,7 +46,7 @@ async def test_independent_instances_share_counter(monkeypatch):
 @pytest.mark.asyncio
 async def test_missing_or_untrusted_origin_rejected_in_production(client, monkeypatch):
     from app import main
-    monkeypatch.setattr(main, "settings", SimpleNamespace(is_production=True, cors_origins_list=["https://example.invalid"]))
+    monkeypatch.setattr(main, "settings", SimpleNamespace(is_production=True, straz_cookie_name="straz_session", cors_origins_list=["https://example.invalid"]))
     for headers in [{}, {"Origin": "https://attacker.invalid"}]:
         response = await client.post("/auth/logout", headers=headers)
         assert response.status_code == 403

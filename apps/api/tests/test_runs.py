@@ -7,10 +7,14 @@ from app.models import App, ScanProfile, Target, TargetStatus
 
 
 @pytest.mark.asyncio
-async def test_run_creation_and_validation(auth_client: AsyncClient, db_session: AsyncSession):
+async def test_run_creation_and_validation(auth_client: AsyncClient, db_session: AsyncSession, test_user):
+    from sqlalchemy import select
+    from app.models import OrganizationMember
+    org_id = await db_session.scalar(select(OrganizationMember.org_id).where(OrganizationMember.user_id == test_user.id))
     # Setup test app
     app = App(
         id=uuid.uuid4(),
+        organization_id=org_id,
         name="Scanned App",
         base_url="https://scanned.example.com",
         heartbeat_enabled=True,

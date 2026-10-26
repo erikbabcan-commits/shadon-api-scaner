@@ -68,7 +68,7 @@ export type AuditLogItem = {
   ip_address: string | null;
   user_agent: string | null;
   detail: string | null;
-  details: Record<string, any> | null;
+  details: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -189,15 +189,15 @@ export function buildApiUrl(path: string): string {
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = buildApiUrl(path);
 
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("X-Requested-With", "XMLHttpRequest");
+  if (currentOrgId) headers.set("X-Organization-Id", currentOrgId);
   const res = await fetch(url, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-      ...(currentOrgId ? { "X-Organization-Id": currentOrgId } : {}),
-      ...(init?.headers || {}),
-    },
     ...init,
+    credentials: "include",
+    cache: "no-store",
+    headers,
   });
 
   if (res.status === 204) {
@@ -281,7 +281,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  getReportHtmlUrl: (appId: string) => buildApiUrl(`/api/apps/${appId}/report/html`),
+  getReportHtmlUrl: (appId: string) => buildApiUrl(`/api/apps/${appId}/report/html${currentOrgId ? `?organization_id=${encodeURIComponent(currentOrgId)}` : ""}`),
   getChannels: (orgId: string) =>
     request<any[]>(`/api/orgs/${orgId}/channels`),
   createChannel: (orgId: string, data: any) =>
@@ -437,7 +437,7 @@ export const api = {
     const qs = q.toString();
     return request<AuditLogListResponse>(`/api/orgs/${orgId}/audit-logs${qs ? `?${qs}` : ""}`);
   },
-  exportAuditCsvUrl: (orgId: string) => `/api/orgs/${orgId}/audit-logs/export.csv`,
+  exportAuditCsvUrl: (orgId: string) => buildApiUrl(`/api/orgs/${orgId}/audit-logs/export.csv?organization_id=${encodeURIComponent(orgId)}`),
   getLiveness: () => request<{ status: string; uptime_seconds: number }>("/healthz/liveness"),
   getReadiness: () =>
     request<{

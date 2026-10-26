@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+import asyncio
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
@@ -25,6 +27,7 @@ async def liveness_probe() -> dict[str, Any]:
     uptime = int(time.time() - _START_TIME)
     return {
         "status": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "straz-api",
         "uptime_seconds": uptime,
     }
@@ -39,8 +42,9 @@ async def readiness_probe(
     Kubernetes / Cloud provider readiness probe.
     Verifies live connectivity and latencies for PostgreSQL / SQLite and Redis.
     """
-    db_ok, db_latency_ms, db_err = await check_database_latency(db)
-    redis_ok, redis_latency_ms, redis_err = await check_redis_latency(settings.redis_url)
+    (db_ok, db_latency_ms, db_err), (redis_ok, redis_latency_ms, redis_err) = await asyncio.gather(
+        check_database_latency(db), check_redis_latency(settings.redis_url)
+    )
 
     checks: dict[str, Any] = {
         "database": {
@@ -55,7 +59,7 @@ async def readiness_probe(
         },
     }
 
-    if not db_ok:
+    if not (db_ok and redis_ok):
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={

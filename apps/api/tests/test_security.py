@@ -23,7 +23,7 @@ def test_tampered_token_rejected():
 
 @pytest.mark.asyncio
 async def test_security_headers_and_request_id(client: AsyncClient):
-    resp = await client.get("/api/health")
+    resp = await client.get("/healthz/liveness")
     assert resp.status_code == 200
     assert "x-request-id" in resp.headers
     assert resp.headers.get("x-content-type-options") == "nosniff"

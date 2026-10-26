@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import uuid
+import base64
+import hashlib
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, HttpUrl
-from sqlalchemy import or_, select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.db import get_db
 from app.deps import OrgContext, require_org_role
-from app.models import App, Finding, Organization, OrgRole
+from app.models import App, Finding, OrgRole
 from app.services.audit import write_audit
 from app.services.compliance import (
     calculate_security_score,
@@ -20,15 +21,23 @@ from app.services.compliance import (
     map_owasp_top_10,
 )
 from app.services.quota import get_plan_tier
-from app.services.reporting import generate_html_report
+from app.services.reporting import generate_html_report, PRINT_SCRIPT
 
 router = APIRouter(tags=["reports"])
 
 
 class BrandingUpdateRequest(BaseModel):
-    custom_logo_url: str | None = None
-    brand_color: str | None = None
-    report_footer_text: str | None = None
+    custom_logo_url: str | None = Field(default=None, max_length=500)
+    brand_color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    report_footer_text: str | None = Field(default=None, max_length=255)
+
+    @field_validator("custom_logo_url")
+    @classmethod
+    def validate_logo(cls, value: str | None) -> str | None:
+        if value:
+            from app.services.safe_http import validate_public_url
+            validate_public_url(value, https_only=True)
+        return value
 
 
 @router.get("/apps/{app_id}/compliance")
@@ -40,7 +49,7 @@ async def get_app_compliance(
     app = await db.scalar(
         select(App).where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -55,6 +64,8 @@ async def get_app_compliance(
     owasp = map_owasp_top_10(findings)
 
     return {
+        "assessment_type": "technical_indicators_not_legal_certification",
+        "coverage": "not_verified",
         "app_id": app.id,
         "app_name": app.name,
         "base_url": app.base_url,
@@ -73,7 +84,7 @@ async def get_app_html_report(
     app = await db.scalar(
         select(App).where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -84,7 +95,11 @@ async def get_app_html_report(
     )
 
     html_text = generate_html_report(app, org_ctx.organization, findings)
-    return HTMLResponse(content=html_text, status_code=200)
+    script_hash = base64.b64encode(hashlib.sha256(PRINT_SCRIPT.encode()).digest()).decode()
+    return HTMLResponse(content=html_text, status_code=200, headers={
+        "Content-Security-Policy": f"default-src 'none'; script-src 'sha256-{script_hash}'; style-src 'unsafe-inline'; img-src https:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        "Cache-Control": "no-store",
+    })
 
 
 @router.get("/orgs/{org_id}/branding")

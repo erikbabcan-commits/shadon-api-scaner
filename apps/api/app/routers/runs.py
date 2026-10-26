@@ -9,13 +9,13 @@ from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
-from app.models import App, OrgRole, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, User
+from app.deps import OrgContext, require_org_role
+from app.models import App, OrgRole, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, OrganizationMember, User
 from app.rate_limit import client_ip, run_limiter
 from app.schemas import RunCreate, RunOut
 from app.services.audit import write_audit
@@ -56,7 +56,7 @@ async def list_runs(
     db: AsyncSession = Depends(get_db),
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> list[ScanRun]:
-    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    org_filter = App.organization_id == org_ctx.org_id
     count_stmt = (
         select(func.count())
         .select_from(ScanRun)
@@ -92,9 +92,15 @@ async def stream_runs(
     db: AsyncSession = Depends(get_db),
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> StreamingResponse:
+    org_id, user_id, token_version = org_ctx.org_id, org_ctx.user.id, org_ctx.user.token_version
     async def event_generator():
         while True:
             if await request.is_disconnected():
+                break
+            authorized = await db.scalar(select(User.id).join(OrganizationMember).where(
+                User.id == user_id, User.token_version == token_version, OrganizationMember.org_id == org_id
+            ))
+            if authorized is None:
                 break
             stmt = (
                 select(ScanRun)
@@ -106,6 +112,7 @@ async def stream_runs(
             if app_id:
                 stmt = stmt.where(ScanRun.app_id == app_id)
             items = list(await db.scalars(stmt))
+            await db.commit()
             payload = [
                 {
                     "id": str(r.id),
@@ -136,7 +143,7 @@ async def get_run(
         .join(App, ScanRun.app_id == App.id)
         .where(
             ScanRun.id == run_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     run = await db.scalar(stmt)
@@ -159,7 +166,7 @@ async def create_run(
     app = await db.scalar(
         select(App).where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -213,7 +220,11 @@ async def create_run(
     try:
         redis = await get_arq_redis(settings)
         await redis.enqueue_job("execute_scan_run", str(run.id))
-    except Exception as exc:
-        logger.error("Failed to enqueue scan run %s to ARQ: %s", run.id, exc)
+    except Exception:
+        logger.error("Failed to enqueue scan run %s", run.id)
+        run.status = RunStatus.failed
+        run.error = "Scan queue unavailable"
+        await db.commit()
+        raise HTTPException(status_code=503, detail="Scan queue unavailable") from None
 
     return run

@@ -5,6 +5,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +38,13 @@ async def create_api_key(
     Raw key is only available at creation time.
     """
     raw_token, key_prefix, key_hash = generate_raw_api_key()
-    valid_scopes = scopes or ["ci:scan", "apps:read"]
+    valid_scopes = ["ci:scan", "apps:read"] if scopes is None else scopes
+    if not set(valid_scopes).issubset({"ci:scan", "apps:read", "findings:read", "reports:read"}):
+        raise HTTPException(status_code=422, detail="Unknown API key scope")
+    if expires_at:
+        expires_at = expires_at.replace(tzinfo=timezone.utc) if expires_at.tzinfo is None else expires_at
+        if expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=422, detail="API key expiry must be in the future")
 
     api_key = ApiKey(
         id=uuid.uuid4(),
@@ -50,7 +57,7 @@ async def create_api_key(
         expires_at=expires_at,
     )
     db.add(api_key)
-    await db.commit()
+    await db.flush()
     await db.refresh(api_key)
     return api_key, raw_token
 
@@ -78,5 +85,5 @@ async def revoke_api_key(
     if not key:
         return False
     await db.delete(key)
-    await db.commit()
+    await db.flush()
     return True

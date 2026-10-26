@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import time
+import base64
 from typing import Any
 
 from app.models import AlertChannel
@@ -138,7 +139,7 @@ def format_webhook(
 def format_ntfy(channel: AlertChannel, event_type: str, severity: str, title: str, detail: str | None, app_name: str | None) -> tuple[str, dict[str, str]]:
     priority = "5" if severity == "critical" else ("4" if severity == "high" else "3")
     headers = {
-        "Title": f"Stráž: {title}",
+        "Title": "=?UTF-8?B?" + base64.b64encode(f"Stráž: {title[:180]}".encode("utf-8")).decode("ascii") + "?=",
         "Priority": priority,
         "Tags": "warning,shield" if severity in ("critical", "high") else "information",
     }

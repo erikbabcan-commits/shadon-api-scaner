@@ -1,25 +1,25 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 import time
 import uuid
-from typing import Any, Literal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import OrgContext, require_scope
+from app.deps import OrgContext, get_current_user, get_current_org, require_scope, ROLE_HIERARCHY
 from app.models import (
     App,
     RunStatus,
     ScanProfile,
     ScanRun,
+    OrgRole,
     Target,
     TargetStatus,
 )
@@ -59,6 +59,7 @@ class CiScanResponse(BaseModel):
 @router.post("/scan", response_model=CiScanResponse)
 async def ci_scan(
     body: CiScanRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     org_ctx: OrgContext = Depends(require_scope("ci:scan")),
     settings: Settings = Depends(get_settings),
@@ -67,7 +68,7 @@ async def ci_scan(
     app = await db.scalar(
         select(App).where(
             App.id == body.app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -122,8 +123,10 @@ async def ci_scan(
         redis = await get_arq_redis(settings)
         await redis.enqueue_job("execute_scan_run", str(run.id))
     except Exception:
-        # If redis/worker unavailable (e.g. unit test or standalone), continue
-        pass
+        run.status = RunStatus.failed
+        run.error = "Scan queue unavailable"
+        await db.commit()
+        raise HTTPException(status_code=503, detail="Scan queue unavailable") from None
 
     report_url = f"/apps/{app.id}/compliance"
     status_url = f"/api/ci/runs/{run.id}"
@@ -146,9 +149,14 @@ async def ci_scan(
     deadline = start_time + min(body.timeout_seconds, 600)
 
     while time.monotonic() < deadline:
+        user = await get_current_user(request, db=db, settings=settings)
+        current = await get_current_org(request, user=user, db=db)
+        if ROLE_HIERARCHY[current.role] < ROLE_HIERARCHY[OrgRole.member]:
+            raise HTTPException(status_code=403, detail="CI scans require member role")
         await db.refresh(run)
         if run.status in (RunStatus.done, RunStatus.failed):
             break
+        await db.commit()  # Do not retain an idle DB transaction during polling.
         await asyncio.sleep(1)
 
     if run.status == RunStatus.queued or run.status == RunStatus.running:
@@ -206,7 +214,7 @@ async def get_ci_run_status(
         .join(App, ScanRun.app_id == App.id)
         .where(
             ScanRun.id == run_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     run = await db.scalar(stmt)
@@ -229,7 +237,10 @@ async def get_ci_run_status(
         "status_url": status_url,
     }
 
-    if run.status == RunStatus.done and not passed:
+    if run.status == RunStatus.failed or (run.status == RunStatus.done and not passed):
         return JSONResponse(status_code=status.HTTP_424_FAILED_DEPENDENCY, content=resp_data)
+
+    if run.status in (RunStatus.queued, RunStatus.running):
+        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=resp_data)
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=resp_data)

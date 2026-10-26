@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 
 
 def _header_value(value: str) -> str:

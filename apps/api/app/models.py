@@ -19,9 +19,12 @@ from sqlalchemy import (
     CHAR,
     UniqueConstraint,
     func,
+    event,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapper
+from sqlalchemy.engine import Connection
 
 from app.db import Base
 
@@ -418,6 +421,13 @@ class ApiKey(Base):
 
     organization: Mapped[Organization] = relationship()
     user: Mapped[User] = relationship()
+
+
+@event.listens_for(AuditEvent, "before_update")
+@event.listens_for(AuditEvent, "before_delete")
+def prevent_audit_orm_mutation(mapper: Mapper[AuditEvent], connection: Connection, target: AuditEvent) -> None:
+    # Defence in depth; DB triggers and DB role separation are still required.
+    raise ValueError("Audit records are immutable")
 
 
 class ScanRunFinding(Base):

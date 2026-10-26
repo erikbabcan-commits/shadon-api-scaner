@@ -118,6 +118,8 @@ async def test_checkout_and_webhook_upgrade(
         "type": "checkout.session.completed",
         "data": {
             "object": {
+                "mode": "subscription",
+                "payment_status": "paid",
                 "client_reference_id": str(org.id),
                 "customer": "cus_test_12345",
                 "subscription": "sub_test_12345",
@@ -125,10 +127,14 @@ async def test_checkout_and_webhook_upgrade(
             }
         },
     }
+    import hmac, hashlib, time
+    body = json.dumps(webhook_payload)
+    timestamp = str(int(time.time()))
+    signature = hmac.new(settings.stripe_webhook_secret.encode(), f"{timestamp}.{body}".encode(), hashlib.sha256).hexdigest()
     wh_resp = await client.post(
         "/api/billing/webhook",
-        content=json.dumps(webhook_payload),
-        headers={"Content-Type": "application/json"},
+        content=body,
+        headers={"Content-Type": "application/json", "Stripe-Signature": f"t={timestamp},v1={signature}"},
     )
     assert wh_resp.status_code == 200
 

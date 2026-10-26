@@ -5,14 +5,14 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
-from app.models import App, OrgRole, Target, TargetStatus, User
+from app.deps import OrgContext, require_org_role
+from app.models import App, OrgRole, Target, TargetStatus
 from app.schemas import AppCreate, AppOut, AppUpdate, TargetCreate, TargetOut, TrustPrivateRequest
 from app.services.audit import write_audit
 from app.services.quota import check_app_limit
@@ -21,10 +21,10 @@ from app.services.verify import is_ip_in_trusted_nets, verify_target
 router = APIRouter(tags=["apps"])
 
 
-async def _bust_overview_cache(settings: Settings) -> None:
+async def _bust_overview_cache(settings: Settings, org_id: uuid.UUID) -> None:
     from app.routers.findings import _invalidate_overview_cache
 
-    await _invalidate_overview_cache(settings)
+    await _invalidate_overview_cache(settings, org_id)
 
 
 @router.get("/apps", response_model=list[AppOut])
@@ -35,7 +35,7 @@ async def list_apps(
     db: AsyncSession = Depends(get_db),
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> list[App]:
-    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    org_filter = App.organization_id == org_ctx.org_id
     count_stmt = select(func.count()).select_from(App).where(org_filter)
     total = await db.scalar(count_stmt) or 0
 
@@ -91,7 +91,7 @@ async def create_app(
         detail=app.name,
     )
     await db.commit()
-    await _bust_overview_cache(settings)
+    await _bust_overview_cache(settings, org_ctx.org_id)
 
     return await db.scalar(select(App).where(App.id == app.id).options(selectinload(App.targets)))  # type: ignore[return-value]
 
@@ -106,7 +106,7 @@ async def get_app(
         select(App)
         .where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
         .options(selectinload(App.targets))
     )
@@ -126,7 +126,7 @@ async def update_app(
     app = await db.scalar(
         select(App).where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -143,7 +143,7 @@ async def update_app(
         detail=",".join(data.keys()),
     )
     await db.commit()
-    await _bust_overview_cache(settings)
+    await _bust_overview_cache(settings, org_ctx.org_id)
 
     return await db.scalar(select(App).where(App.id == app.id).options(selectinload(App.targets)))  # type: ignore[return-value]
 
@@ -158,7 +158,7 @@ async def delete_app(
     app = await db.scalar(
         select(App).where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -173,7 +173,7 @@ async def delete_app(
     )
     await db.delete(app)
     await db.commit()
-    await _bust_overview_cache(settings)
+    await _bust_overview_cache(settings, org_ctx.org_id)
 
 
 @router.post("/apps/{app_id}/targets", response_model=TargetOut, status_code=status.HTTP_201_CREATED)
@@ -186,12 +186,12 @@ async def add_target(
     app = await db.scalar(
         select(App).where(
             App.id == app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
-    target = Target(app_id=app_id, host=body.host.strip(), verify_token=secrets.token_urlsafe(24))
+    target = Target(id=uuid.uuid4(), app_id=app_id, host=body.host.strip(), verify_token=secrets.token_urlsafe(24))
     db.add(target)
     await write_audit(
         db,
@@ -219,7 +219,7 @@ async def verify_target_endpoint(
     app = await db.scalar(
         select(App).where(
             App.id == target.app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -263,6 +263,8 @@ async def trust_private_target(
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
     settings: Settings = Depends(get_settings),
 ) -> Target:
+    if settings.is_production:
+        raise HTTPException(status_code=403, detail="Private targets require a dedicated isolated worker")
     if not body.confirm:
         raise HTTPException(status_code=400, detail="confirm must be true")
     target = await db.get(Target, target_id)
@@ -271,7 +273,7 @@ async def trust_private_target(
     app = await db.scalar(
         select(App).where(
             App.id == target.app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:
@@ -307,7 +309,7 @@ async def delete_target(
     app = await db.scalar(
         select(App).where(
             App.id == target.app_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     if not app:

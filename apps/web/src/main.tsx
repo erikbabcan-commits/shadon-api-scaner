@@ -5,6 +5,9 @@ import { RouterProvider } from "@tanstack/react-router";
 import { router } from "./router";
 import "./index.css";
 
+// Retire the credentialed API cache left by previous service workers.
+if ("caches" in globalThis) void caches.delete("straz-api");
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

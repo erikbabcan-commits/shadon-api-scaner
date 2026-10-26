@@ -6,9 +6,8 @@ import json
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 
-from app.models import App, Finding, FindingSeverity, Organization
+from app.models import App, Finding, Organization
 from app.services.compliance import (
     calculate_security_score,
     evaluate_nis2_areas,
@@ -16,6 +15,8 @@ from app.services.compliance import (
 )
 from app.services.quota import get_plan_tier
 
+
+PRINT_SCRIPT = "window.addEventListener('load',function(){window.print();});"
 
 def redact_sensitive_text(text: str | None) -> str | None:
     if not text:
@@ -39,11 +40,19 @@ def generate_html_report(
 
     is_white_label = tier in ("pro", "agency")
     brand_color = org.brand_color if (is_white_label and org.brand_color) else "#0284c7"
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", brand_color):
+        brand_color = "#0284c7"
     logo_url = org.custom_logo_url if (is_white_label and org.custom_logo_url) else None
+    if logo_url:
+        from app.services.safe_http import validate_public_url
+        try:
+            validate_public_url(logo_url, https_only=True)
+        except ValueError:
+            logo_url = None
     footer_text = (
         org.report_footer_text
         if (is_white_label and org.report_footer_text)
-        else "Vygenerované bezpečnostnou platformou Stráž Security Intelligence • Certifikovaný export pre audit a compliance."
+        else "Vygenerované bezpečnostnou platformou Stráž Security Intelligence • Technický report nie je certifikáciou ani právnym posúdením zhody."
     )
 
     scoring = calculate_security_score(findings, app)
@@ -268,20 +277,15 @@ def generate_html_report(
     </table>''' if owasp_rows else ''}
 
     <h2>3. Detail technických zraniteľností a odporúčané nápravy</h2>
-    {''.join(findings_rows) if findings_rows else '<p style="color:#10b981;font-weight:600;font-size:14px;">Neboli zistené žiadne aktívne zraniteľnosti. Systém spĺňa štandardy bezpečnostnej hygieny.</p>'}
+    {''.join(findings_rows) if findings_rows else '<p style="color:#10b981;font-weight:600;font-size:14px;">Neboli zistené žiadne aktívne zraniteľnosti. Výsledok nepreukazuje úplnosť pokrytia ani právny súlad.</p>'}
 
     <div class="footer">
         <div>{html.escape(footer_text)}</div>
         <div>Overovací hash záznamu: {sha256_hash}</div>
     </div>
 
-    <script class="no-print">
-        window.addEventListener('load', function() {{
-            setTimeout(function() {{
-                window.print();
-            }}, 400);
-        }});
-    </script>
+
+    <script>{PRINT_SCRIPT}</script>
 </body>
 </html>
 """

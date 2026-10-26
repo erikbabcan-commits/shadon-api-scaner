@@ -10,12 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.models import AlertChannel, AlertEvent, App
-from app.services.notifications.channels import (
-    check_channel_limit,
-    list_org_channels,
-    mask_sensitive_url,
-    validate_channel_for_plan,
-)
+
 from app.services.notifications.transport import send_to_channel
 
 logger = logging.getLogger("straz.notifications")
@@ -61,6 +56,8 @@ async def dispatch_alert(
         AlertChannel.is_active == True,
     )
     if app:
+        if app.organization_id != org_id:
+            raise ValueError("Alert tenant mismatch")
         # channel is either global (app_id is None) or specifically for this app
         stmt = stmt.where((AlertChannel.app_id == None) | (AlertChannel.app_id == app.id))
     else:
@@ -71,11 +68,10 @@ async def dispatch_alert(
         return
 
     current_sev_level = SEVERITY_LEVELS.get(severity.lower(), 1)
-    is_test_env = settings.straz_env in ("test", "testing", "development") if settings else True
 
     for ch in channels:
         ch_min_level = SEVERITY_LEVELS.get(ch.min_severity.lower(), 4)
-        if current_sev_level < ch_min_level:
+        if event_type == "finding.created" and current_sev_level < ch_min_level:
             continue
 
         events_list = json.loads(ch.events) if ch.events else ["finding.created"]
@@ -97,15 +93,37 @@ async def dispatch_alert(
         db.add(alert_event)
         await db.flush()
 
-        # Send asynchronously
-        success = await send_to_channel(
-            channel=ch,
-            event_type=event_type,
-            severity=severity,
-            title=title,
-            detail=detail,
-            app_name=app.name if app else None,
-            is_test_env=is_test_env,
-        )
-        alert_event.status = "sent" if success else "failed"
+        # Committed together with findings; delivery is performed after commit.
+
+
+async def process_alert_outbox(ctx: dict[str, Any]) -> None:
+    import asyncio
+    from datetime import datetime, timezone
+    from app.db import SessionLocal
+    pending: list[tuple[AlertEvent, AlertChannel, str | None]] = []
+    async with SessionLocal() as db:
+        rows = list(await db.scalars(select(AlertEvent).where(AlertEvent.status == "pending")
+            .order_by(AlertEvent.created_at).limit(25).with_for_update(skip_locked=True)))
+        for row in rows:
+            channel = await db.get(AlertChannel, row.channel_id)
+            app = await db.get(App, row.app_id) if row.app_id else None
+            if channel is None or not channel.is_active or channel.org_id != row.org_id or (app and app.organization_id != row.org_id):
+                row.status = "failed"
+                continue
+            row.status = "processing"
+            pending.append((row, channel, app.name if app else None))
+        await db.commit()
+    semaphore = asyncio.Semaphore(8)
+    async def deliver(item: tuple[AlertEvent, AlertChannel, str | None]) -> tuple[uuid.UUID, bool]:
+        row, channel, app_name = item
+        async with semaphore:
+            success = await send_to_channel(channel, row.event_type, row.severity, row.title, row.detail, app_name)
+        return row.id, success
+    results = await asyncio.gather(*(deliver(item) for item in pending))
+    async with SessionLocal() as db:
+        for event_id, success in results:
+            processed_event = await db.get(AlertEvent, event_id)
+            if processed_event and processed_event.status == "processing":
+                processed_event.status = "sent" if success else "failed"
+                processed_event.processed_at = datetime.now(timezone.utc)
         await db.commit()

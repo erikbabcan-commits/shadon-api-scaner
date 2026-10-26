@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+import socket
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -14,6 +15,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 os.environ["STRAZ_SESSION_SECRET"] = "test-session-secret-at-least-32-chars-long"
 os.environ["STRAZ_ADMIN_PASSWORD"] = "test-admin-secret-password-123"
+os.environ["STRIPE_WEBHOOK_SECRET"] = "local-signing-secret-for-unit-tests"
 
 from app.config import Settings, get_settings
 from app.db import Base, get_db
@@ -31,6 +33,40 @@ test_engine = create_async_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False, class_=AsyncSession)
+
+
+@pytest.fixture(autouse=True)
+def isolated_io(monkeypatch):
+    """The application test suite never scans or contacts an external service."""
+    import httpx
+    from app import rate_limit
+    from app import security
+    from argon2 import PasswordHasher
+    from app.routers import runs, ci
+    rate_limit._in_memory_limiter._hits.clear()
+    # Small synthetic test hashes only; production PasswordHasher is unchanged.
+    monkeypatch.setattr(security, "ph", PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1))
+
+    async def deny_http(self, request):
+        raise httpx.ConnectError("External HTTP disabled in tests", request=request)
+
+    class LocalQueue:
+        async def enqueue_job(self, *args, **kwargs):
+            return object()
+
+    async def local_queue(settings):
+        return LocalQueue()
+
+    original_connect = socket.socket.connect
+    def local_connect(sock, address):
+        if sock.family in (socket.AF_INET, socket.AF_INET6) and address[0] not in {"127.0.0.1", "::1", "localhost"}:
+            raise OSError("External sockets disabled in tests")
+        return original_connect(sock, address)
+
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", deny_http)
+    monkeypatch.setattr(socket.socket, "connect", local_connect)
+    monkeypatch.setattr(runs, "get_arq_redis", local_queue)
+    monkeypatch.setattr(ci, "get_arq_redis", local_queue)
 
 
 @pytest_asyncio.fixture(scope="function")

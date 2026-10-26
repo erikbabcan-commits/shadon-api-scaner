@@ -11,6 +11,7 @@
 # ==============================================================================
 
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -39,25 +40,29 @@ log "INFO: Starting Stráž PostgreSQL backup..."
 
 # Ensure destination directory exists
 mkdir -p "${BACKUP_DIR}"
+TEMP_PATH="$(mktemp "${BACKUP_DIR}/.straz-backup.XXXXXXXX")"
+trap 'rm -f "${TEMP_PATH}"' EXIT
 
 # Execute pg_dump inside container and compress
 if docker compose -f "${SCRIPT_DIR}/docker-compose.yml" ps --services --filter "status=running" | grep -q "^postgres$"; then
     log "INFO: Dumping database '${POSTGRES_DB}' from docker compose service '${CONTAINER_NAME}'..."
     docker compose -f "${SCRIPT_DIR}/docker-compose.yml" exec -T postgres \
         pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --clean --if-exists --no-owner --no-privileges \
-        | gzip -9 > "${BACKUP_PATH}"
+        | gzip -9 > "${TEMP_PATH}"
 else
     log "ERROR: Container '${CONTAINER_NAME}' is not running! Backup aborted."
     exit 1
 fi
 
 # Verify backup file size
-if [ ! -s "${BACKUP_PATH}" ]; then
+if [ ! -s "${TEMP_PATH}" ]; then
     log "ERROR: Backup file was created but is empty: ${BACKUP_PATH}"
     rm -f "${BACKUP_PATH}"
     exit 1
 fi
 
+gzip -t "${TEMP_PATH}"
+mv "${TEMP_PATH}" "${BACKUP_PATH}"
 FILESIZE=$(du -h "${BACKUP_PATH}" | cut -f1)
 log "SUCCESS: Backup completed successfully: ${BACKUP_PATH} (${FILESIZE})"
 

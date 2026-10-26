@@ -61,17 +61,11 @@ export default defineConfig(({ mode }: { mode: string }) => {
         },
         workbox: {
           navigateFallback: "/index.html",
-          navigateFallbackDenylist: [/^\/api\//],
+          navigateFallbackDenylist: [/^\/api\//, /^\/healthz\//],
           runtimeCaching: [
             {
               urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith("/api/"),
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "straz-api",
-                networkTimeoutSeconds: 5,
-                expiration: { maxEntries: 50, maxAgeSeconds: 60 * 30 },
-                cacheableResponse: { statuses: [0, 200] },
-              },
+              handler: "NetworkOnly",
             },
           ],
         },

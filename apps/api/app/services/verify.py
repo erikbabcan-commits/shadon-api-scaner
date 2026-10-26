@@ -4,10 +4,11 @@ import ipaddress
 import socket
 from urllib.parse import urlparse
 
-import dns.resolver
+import dns.asyncresolver
 import httpx
 
 from app.config import Settings
+from app.services.safe_http import public_http_client
 
 
 def extract_hostname(host_or_url: str) -> str:
@@ -40,26 +41,30 @@ def is_ip_in_trusted_nets(host: str, nets: list[str]) -> bool:
 async def verify_dns_txt(hostname: str, token: str) -> bool:
     expected = f"straz-verify={token}"
     try:
-        answers = dns.resolver.resolve(hostname, "TXT")
+        answers = await dns.asyncresolver.resolve(hostname, "TXT", lifetime=3)
     except Exception:
         return False
     for rdata in answers:
-        for txt in rdata.strings:
-            text = txt.decode() if isinstance(txt, bytes) else str(txt)
-            if text.strip() == expected:
-                return True
+        text = b"".join(rdata.strings).decode("utf-8", errors="replace")
+        if text.strip() == expected:
+            return True
     return False
 
 
 async def verify_well_known(base_url: str, token: str) -> bool:
     url = base_url.rstrip("/") + "/.well-known/straz.txt"
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            resp = await client.get(url)
-            if resp.status_code != 200:
-                return False
-            return resp.text.strip() == token
-    except httpx.HTTPError:
+        async with public_http_client(timeout=3) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    return False
+                body = b""
+                async for part in resp.aiter_bytes():
+                    body += part
+                    if len(body) > 4096:
+                        return False
+                return body.decode("utf-8", errors="replace").strip() == token
+    except (httpx.HTTPError, ValueError, OSError, TimeoutError):
         return False
 
 
@@ -73,8 +78,12 @@ async def verify_target(
     hostname = extract_hostname(host)
     if await verify_dns_txt(hostname, token):
         return "dns_txt"
-    if await verify_well_known(base_url, token):
-        return "well_known"
+    # A proof on the application's unrelated host never verifies a new target.
+    parsed = urlparse(base_url)
+    if parsed.hostname and parsed.hostname.lower() == hostname:
+        authority = parsed.netloc
+        if await verify_well_known(f"{parsed.scheme}://{authority}", token):
+            return "well_known"
     if await verify_well_known(f"https://{hostname}", token):
         return "well_known"
     if await verify_well_known(f"http://{hostname}", token):

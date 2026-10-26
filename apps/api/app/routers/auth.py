@@ -32,21 +32,10 @@ def _set_auth_cookie(response: Response, token: str, settings: Settings) -> None
         httponly=True,
         secure=secure,
         samesite=samesite,  # type: ignore[arg-type]
-        domain=settings.straz_cookie_domain,
+        domain=None if settings.straz_cookie_secure else settings.straz_cookie_domain,
         max_age=settings.straz_session_max_age,
         path="/",
     )
-    if settings.straz_cookie_secure:
-        response.set_cookie(
-            key=settings.straz_cookie_name,
-            value=token,
-            httponly=True,
-            secure=secure,
-            samesite=samesite,  # type: ignore[arg-type]
-            domain=settings.straz_cookie_domain,
-            max_age=settings.straz_session_max_age,
-            path="/",
-        )
 
 
 def _clear_auth_cookie(response: Response, settings: Settings) -> None:
@@ -55,7 +44,7 @@ def _clear_auth_cookie(response: Response, settings: Settings) -> None:
         if settings.straz_cookie_secure
         else settings.straz_cookie_name
     )
-    response.delete_cookie(cookie_name, path="/", domain=settings.straz_cookie_domain)
+    response.delete_cookie(cookie_name, path="/", domain=None if settings.straz_cookie_secure else settings.straz_cookie_domain)
     response.delete_cookie(settings.straz_cookie_name, path="/", domain=settings.straz_cookie_domain)
 
 
@@ -120,6 +109,7 @@ async def logout(
     settings: Settings = Depends(get_settings),
 ) -> None:
     _clear_auth_cookie(response, settings)
+    user.token_version += 1
     await write_audit(db, action="auth.logout", user_id=user.id)
     await db.commit()
 

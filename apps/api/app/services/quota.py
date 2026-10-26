@@ -73,10 +73,19 @@ def get_plan_tier(org: Organization) -> str:
     tier = (org.plan_tier or "free").lower()
     if tier not in PLANS:
         return "free"
-    # If subscription is past_due or canceled, downgrade to free
-    if org.subscription_status and org.subscription_status.lower() in ("canceled", "past_due"):
+    if org.subscription_status not in (None, "active", "trialing"):
         return "free"
+    if org.current_period_end:
+        end = org.current_period_end
+        end = end.replace(tzinfo=timezone.utc) if end.tzinfo is None else end
+        if end <= datetime.now(timezone.utc):
+            return "free"
     return tier
+
+
+async def lock_organization(db: AsyncSession, org: Organization) -> None:
+    await db.scalar(select(Organization).where(Organization.id == org.id)
+        .with_for_update().execution_options(populate_existing=True))
 
 
 def get_plan_config(org: Organization) -> dict[str, Any]:
@@ -85,7 +94,7 @@ def get_plan_config(org: Organization) -> dict[str, Any]:
 
 
 def get_current_period_bounds(org: Organization) -> tuple[datetime, datetime]:
-    if org.current_period_start and org.current_period_end:
+    if get_plan_tier(org) != "free" and org.current_period_start and org.current_period_end:
         return org.current_period_start, org.current_period_end
     # Calendar month UTC
     now = datetime.now(timezone.utc)
@@ -125,6 +134,7 @@ async def get_current_scan_usage(db: AsyncSession, org_id: uuid.UUID) -> int:
 
 
 async def check_app_limit(db: AsyncSession, org: Organization) -> tuple[bool, str | None]:
+    await lock_organization(db, org)
     plan = get_plan_config(org)
     max_apps = plan["max_apps"]
 
@@ -142,6 +152,7 @@ async def check_app_limit(db: AsyncSession, org: Organization) -> tuple[bool, st
 async def check_scan_quota(
     db: AsyncSession, org: Organization, profile: ScanProfile
 ) -> tuple[bool, str | None]:
+    await lock_organization(db, org)
     plan = get_plan_config(org)
 
     # 1. Check profile permission
@@ -220,6 +231,7 @@ async def get_org_usage_stats(db: AsyncSession, org: Organization) -> dict[str, 
 async def check_api_key_limit(db: AsyncSession, org: Organization) -> tuple[bool, str]:
     from app.models import ApiKey
 
+    await lock_organization(db, org)
     plan = get_plan_config(org)
     limit = plan.get("max_api_keys", 0)
 

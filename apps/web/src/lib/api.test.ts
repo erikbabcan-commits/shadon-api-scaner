@@ -1,11 +1,38 @@
-import { describe, expect, it } from "vitest";
-import { buildApiUrl } from "./api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api, buildApiUrl, request, setActiveOrgId } from "./api";
 import { formatDate, formatLatency, formatTimeAgo } from "./format";
 
 describe("API Helper Utilities", () => {
   it("builds API URL correctly with paths", () => {
     expect(buildApiUrl("/api/apps")).toBe("/api/apps");
     expect(buildApiUrl("api/auth/me")).toBe("/api/auth/me");
+  });
+});
+
+describe("Tenant request boundaries", () => {
+  afterEach(() => {
+    setActiveOrgId(null);
+    vi.unstubAllGlobals();
+  });
+
+  it("preserves tenant and CSRF headers when caller supplies Headers", async () => {
+    setActiveOrgId("local-org");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await request("/api/apps", { headers: new Headers({ "X-Test": "local" }) });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Organization-Id")).toBe("local-org");
+    expect(headers.get("X-Requested-With")).toBe("XMLHttpRequest");
+    expect(headers.get("X-Test")).toBe("local");
+    expect(init.cache).toBe("no-store");
+    expect(init.credentials).toBe("include");
+  });
+
+  it("carries the selected tenant in report navigation", () => {
+    setActiveOrgId("selected-org");
+    expect(api.getReportHtmlUrl("local-app")).toContain("organization_id=selected-org");
+    expect(api.exportAuditCsvUrl("selected-org")).toContain("organization_id=selected-org");
   });
 });
 

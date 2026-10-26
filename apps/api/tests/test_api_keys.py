@@ -97,7 +97,7 @@ async def test_api_key_lifecycle_and_auth(client: AsyncClient, db_session: Async
         "/api/apps",
         headers={"Authorization": f"Bearer {raw_key}"},
     )
-    assert authed_resp.status_code == 200
+    assert authed_resp.status_code == 200, authed_resp.json()
     apps_data = authed_resp.json()
     assert any(a["id"] == str(app.id) for a in apps_data)
 
@@ -311,6 +311,7 @@ async def test_ci_scan_gate_execution(client: AsyncClient, db_session: AsyncSess
     run = await db_session.get(ScanRun, uuid.UUID(run_id))
     assert run is not None
     run.status = RunStatus.done
+    run.observations_complete = True
 
     crit_finding = Finding(
         id=uuid.uuid4(),
@@ -322,6 +323,9 @@ async def test_ci_scan_gate_execution(client: AsyncClient, db_session: AsyncSess
         status=FindingStatus.open,
     )
     db_session.add(crit_finding)
+    await db_session.flush()
+    from app.models import ScanRunFinding
+    db_session.add(ScanRunFinding(scan_run_id=run.id, finding_id=crit_finding.id, observed_severity="critical", is_new=True))
     await db_session.commit()
 
     # 5. Check run status via GET /api/ci/runs/{run_id} -> should fail gate due to critical finding (HTTP 424)

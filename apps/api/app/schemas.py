@@ -17,7 +17,7 @@ from app.models import (
 
 class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
-    password: str = Field(min_length=1)
+    password: str = Field(min_length=1, max_length=128)
 
     @field_validator("email")
     @classmethod
@@ -48,58 +48,42 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-import ipaddress
 from typing import Generic, TypeVar
-from urllib.parse import urlparse
 
 T = TypeVar("T")
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(min_length=1)
+    old_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
 
 
 def _validate_safe_url(url: str) -> str:
+    from app.services.safe_http import validate_public_url
     cleaned = url.strip()
-    parsed = urlparse(cleaned)
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError("URL must have http or https scheme")
-    host = parsed.hostname
-    if not host:
-        raise ValueError("URL must contain a valid host")
-
-    blocked_hosts = {"localhost", "127.0.0.1", "::1", "169.254.169.254", "metadata.google.internal"}
-    if host.lower() in blocked_hosts:
-        raise ValueError(f"Restricted host '{host}' not allowed")
-
-    try:
-        ip = ipaddress.ip_address(host)
-        if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
-            raise ValueError(f"Restricted IP address '{host}' not allowed")
-    except ValueError:
-        pass
-
+    validate_public_url(cleaned)
     return cleaned
 
 
 def _validate_safe_git_url(url: str | None) -> str | None:
     if not url:
         return None
-    url = url.strip()
-    if url.startswith("https://") or url.startswith("http://") or url.startswith("git@") or url.startswith("ssh://"):
-        if any(c in url for c in [";", "&", "|", "`", "$", "\n", "\r"]):
-            raise ValueError("git_url contains unsafe characters")
-        return url
-    raise ValueError("git_url must use https, http, git@, or ssh protocol")
+    from app.services.safe_http import validate_public_url
+    cleaned = url.strip()
+    validate_public_url(cleaned, https_only=True)
+    return cleaned
 
 
 def _validate_safe_image_ref(ref: str | None) -> str | None:
     if not ref:
         return None
     ref = ref.strip()
-    if any(c in ref for c in [";", "&", "|", "`", "$", " ", "\n", "\r"]):
+    if "://" in ref or not __import__("re").fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*", ref):
         raise ValueError("image_ref contains unsafe characters")
+    registry = ref.split("/", 1)[0]
+    if "/" in ref and ("." in registry or ":" in registry or registry == "localhost"):
+        from app.services.safe_http import validate_public_url
+        validate_public_url(f"https://{registry}")
     return ref
 
 
@@ -175,7 +159,17 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 
 class TargetCreate(BaseModel):
-    host: str = Field(min_length=1, max_length=500)
+    host: str = Field(min_length=1, max_length=253)
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        from app.services.safe_http import validate_public_url
+        value = value.strip().lower().rstrip(".")
+        parsed = validate_public_url(f"https://{value}")
+        if parsed.host != value or parsed.port is not None or parsed.raw_path != b"/":
+            raise ValueError("Target must be a hostname without a path or port")
+        return value
 
 
 class TargetOut(BaseModel):

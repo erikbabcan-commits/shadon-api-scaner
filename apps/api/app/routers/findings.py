@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -12,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.deps import OrgContext, get_current_org, get_current_user, require_org_role
+from app.deps import OrgContext, require_org_role
 from app.models import (
     App,
     Finding,
@@ -21,7 +20,6 @@ from app.models import (
     OrgRole,
     RunStatus,
     ScanRun,
-    User,
 )
 from app.schemas import FindingOut, FindingUpdate, OverviewApp, OverviewOut
 from app.services.audit import write_audit
@@ -56,7 +54,7 @@ async def list_findings(
     db: AsyncSession = Depends(get_db),
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
 ) -> list[Finding]:
-    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    org_filter = App.organization_id == org_ctx.org_id
     count_stmt = (
         select(func.count())
         .select_from(Finding)
@@ -99,7 +97,7 @@ async def get_finding(
         .join(App, Finding.app_id == App.id)
         .where(
             Finding.id == finding_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     finding = await db.scalar(stmt)
@@ -121,7 +119,7 @@ async def update_finding(
         .join(App, Finding.app_id == App.id)
         .where(
             Finding.id == finding_id,
-            or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None)),
+            App.organization_id == org_ctx.org_id,
         )
     )
     finding = await db.scalar(stmt)
@@ -164,7 +162,7 @@ async def overview(
         pass
 
     # 2. Optimized SQL aggregations scoped to this organization
-    org_filter = or_(App.organization_id == org_ctx.org_id, App.organization_id.is_(None))
+    org_filter = App.organization_id == org_ctx.org_id
     apps = list(
         await db.scalars(
             select(App).where(org_filter).order_by(App.name)

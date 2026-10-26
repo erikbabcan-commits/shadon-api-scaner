@@ -4,16 +4,15 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import redis.asyncio as aioredis
-from sqlalchemy import select, text
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy import select
 
 from app.config import Settings, get_settings
-from app.db import SessionLocal
+from app.db import SessionLocal, get_db
 from app.logging import setup_logging
 from app.migrations import apply_migrations_async
 from app.models import User
@@ -63,9 +62,6 @@ async def bootstrap_admin() -> None:
             select(User).where(User.email == settings.straz_admin_email.lower())
         )
         if existing:
-            from app.security import verify_password
-            if not verify_password(existing.password_hash, settings.straz_admin_password):
-                existing.password_hash = hash_password(settings.straz_admin_password)
             from app.services.organizations import ensure_user_has_org
             await ensure_user_has_org(db, existing)
             await db.commit()
@@ -79,7 +75,7 @@ async def bootstrap_admin() -> None:
         from app.services.organizations import ensure_user_has_org
         await ensure_user_has_org(db, user)
         await db.commit()
-        logger.info("Bootstrapped default admin user: %s", settings.straz_admin_email)
+        logger.info("Bootstrapped initial administrator")
 
 
 @asynccontextmanager
@@ -105,6 +101,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Pydantic's input/ctx fields can contain submitted passwords and webhook URLs.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": error["loc"], "type": error["type"], "msg": "Invalid value"}
+        for error in exc.errors()
+    ]})
+
 # 1. CORS Middleware (allows Vercel frontend or custom origins)
 app.add_middleware(
     CORSMiddleware,
@@ -125,17 +130,28 @@ app.add_middleware(
 @app.middleware("http")
 async def security_and_tracing_middleware(request: Request, call_next):
     start_time = time.monotonic()
-    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request_id = str(uuid.uuid4())
     request.state.request_id = request_id
 
     # Security check: CSRF protection on mutating requests if cross-origin
     # Custom headers like X-Requested-With or standard Origin validation
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         origin = request.headers.get("origin")
-        if settings.is_production:
+        has_cookie = any(name in request.cookies for name in (
+            settings.straz_cookie_name, f"__Host-{settings.straz_cookie_name}"
+        ))
+        public_webhook = request.url.path == "/api/billing/webhook"
+        headless_ci = (
+            request.url.path == "/api/ci/scan"
+            and not has_cookie
+            and request.headers.get("authorization", "").startswith("Bearer straz_live_")
+        )
+        if settings.is_production and not public_webhook and not headless_ci:
             # Check if origin is in allowed origins
-            if origin not in settings.cors_origins_list:
-                logger.warning("Rejected mutating request with untrusted origin: %s", origin)
+            if origin not in settings.cors_origins_list and not (
+                origin is None and request.headers.get("x-requested-with") == "XMLHttpRequest"
+            ):
+                logger.warning("Rejected mutating request with untrusted origin")
                 return JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
                     content={"detail": "Forbidden: untrusted origin"},
@@ -145,10 +161,10 @@ async def security_and_tracing_middleware(request: Request, call_next):
         response: Response = await call_next(request)
     except Exception as exc:
         duration_ms = round((time.monotonic() - start_time) * 1000, 2)
-        logger.exception(
-            "Unhandled exception during %s %s [%.2f ms] (request_id=%s)",
+        logger.error(
+            "Unhandled exception during %s (%s) [%.2f ms] (request_id=%s)",
             request.method,
-            request.url.path,
+            type(exc).__name__,
             duration_ms,
             request_id,
         )
@@ -168,14 +184,16 @@ async def security_and_tracing_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    if "Content-Security-Policy" not in response.headers:
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    response.headers["Cache-Control"] = "no-store"
 
     # Log request in structured format
     if not request.url.path.startswith("/api/health"):
         logger.info(
             "%s %s -> %s [%.2f ms] (request_id=%s)",
             request.method,
-            request.url.path,
+            getattr(request.scope.get("route"), "path", "unmatched-route"),
             response.status_code,
             duration_ms,
             request_id,
@@ -200,50 +218,14 @@ app.include_router(health.router)
 
 
 @app.get("/api/health")
-async def health() -> dict[str, Any]:
-    """Comprehensive health check checking DB and Redis pings, version, and uptime."""
-    db_ok = False
-    redis_ok = False
-
-    try:
-        async with SessionLocal() as db:
-            await db.execute(text("SELECT 1"))
-            db_ok = True
-    except Exception as exc:
-        logger.error("Health check DB failure: %s", exc)
-
-    try:
-        r = aioredis.from_url(settings.redis_url, socket_timeout=1.0)
-        await r.ping()
-        await r.aclose()
-        redis_ok = True
-    except Exception as exc:
-        logger.warning("Health check Redis failure: %s", exc)
-
-    uptime_seconds = int(time.time() - START_TIME)
-    healthy = db_ok and redis_ok
-
-    return {
-        "status": "ok" if healthy else "degraded",
-        "database": "connected" if db_ok else "unreachable",
-        "redis": "connected" if redis_ok else "unreachable",
-        "version": "1.0.0",
-        "uptime_seconds": uptime_seconds,
-    }
-
-
 @app.get("/api/health/ready")
-async def readiness() -> JSONResponse:
-    """Readiness probe for container orchestrators (k8s / docker)."""
-    try:
-        async with SessionLocal() as db:
-            await db.execute(text("SELECT 1"))
-        return JSONResponse(status_code=200, content={"ready": True})
-    except Exception:
-        return JSONResponse(status_code=503, content={"ready": False, "reason": "Database unavailable"})
+async def legacy_readiness(db = Depends(get_db)) -> JSONResponse:
+    from app.routers.health import readiness_probe
+    return await readiness_probe(db=db, settings=settings)
 
 
 @app.post("/api/client-errors", status_code=status.HTTP_204_NO_CONTENT)
-async def log_client_error(payload: dict[str, Any], request: Request) -> None:
+async def log_client_error(request: Request, user: User = Depends(auth.get_current_user)) -> None:
     """Receive and log unhandled frontend JavaScript errors."""
-    logger.warning("Frontend Client Error: %s (ip=%s)", payload, request.client.host if request.client else "unknown")
+    # Never persist arbitrary client messages, stack traces, URLs or form contents.
+    logger.warning("Frontend client error reported")

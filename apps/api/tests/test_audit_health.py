@@ -16,7 +16,7 @@ async def test_audit_log_redaction_and_persistence(db_session: AsyncSession):
     details_with_secrets = {
         "user_email": "auditor@example.com",
         "password": "SuperSecretPassword123!",
-        "api_key": "straz_live_a1b2c3d4e5f6g7h8",
+        "api_key": "straz_live_" + "local_fixture_not_a_real_key",
         "nested": {
             "token": "secret_token_val",
             "safe_property": "production_environment",

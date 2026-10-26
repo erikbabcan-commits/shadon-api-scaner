@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import App, Finding, FindingSeverity, FindingStatus
 
@@ -135,24 +132,24 @@ def evaluate_nis2_areas(findings: list[Finding], app: App | None = None) -> list
         f for f in open_findings
         if any(w in (f.title or "").lower() for w in ["tls", "ssl", "certificate", "rdap", "dns"])
     ]
-    area1_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area1_findings) else ("WARNING" if area1_findings else "COMPLIANT")
+    area1_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area1_findings) else ("WARNING" if area1_findings else "WARNING")
 
     # Area 2: Vulnerability Management
     area2_findings = [
         f for f in open_findings
         if any(w in (f.title or "").lower() for w in ["nuclei", "port", "internetdb", "shodan"])
     ]
-    area2_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area2_findings) else ("WARNING" if area2_findings else "COMPLIANT")
+    area2_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area2_findings) else ("WARNING" if area2_findings else "WARNING")
 
     # Area 3: Supply Chain Security
     area3_findings = [
         f for f in open_findings
         if any(w in (f.title or "").lower() for w in ["trivy", "cve", "gitleaks", "secret", "sast"])
     ]
-    area3_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area3_findings) else ("WARNING" if area3_findings else "COMPLIANT")
+    area3_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area3_findings) else ("WARNING" if area3_findings else "WARNING")
 
     # Area 4: Availability & Incident Monitoring
-    area4_status = "NON-COMPLIANT" if (app and app.last_up is False) else "COMPLIANT"
+    area4_status = "NON-COMPLIANT" if (app and app.last_up is False) else ("COMPLIANT" if app and app.last_up is True else "WARNING")
 
     return [
         {

@@ -40,9 +40,9 @@ V nastaveniach API služby (Variables) doplňte:
 STRAZ_ENV=production
 STRAZ_COOKIE_SECURE=true
 STRAZ_COOKIE_SAMESITE=none
-STRAZ_ADMIN_EMAIL=erikbabcan@gmail.com
+STRAZ_ADMIN_EMAIL=admin@example.invalid
 STRAZ_ADMIN_PASSWORD=heslo
-STRAZ_SESSION_SECRET=vygenerujte-dlhy-nahodny-retazec-min-32-znakov
+STRAZ_SESSION_SECRET="$(openssl rand -hex 32)"
 STRAZ_CORS_ORIGINS=https://straz-monitoring.vercel.app,https://web-flax-omega-55.vercel.app
 APP_FRONTEND_URL=https://straz-monitoring.vercel.app
 ```
@@ -89,14 +89,14 @@ cp .env.example .env
 ```ini
 STRAZ_ENV=production
 STRAZ_DOMAIN=api.vasadomena.sk
-ACME_EMAIL=erikbabcan@gmail.com
+ACME_EMAIL=admin@example.invalid
 STRAZ_CORS_ORIGINS=https://straz-monitoring.vercel.app,https://web-flax-omega-55.vercel.app
 STRAZ_COOKIE_SECURE=true
 STRAZ_COOKIE_SAMESITE=none
-STRAZ_ADMIN_EMAIL=erikbabcan@gmail.com
+STRAZ_ADMIN_EMAIL=admin@example.invalid
 STRAZ_ADMIN_PASSWORD=heslo
-STRAZ_SESSION_SECRET=kryptograficky-kluc-min-32-znakov
-POSTGRES_PASSWORD=silne_db_heslo_123
+STRAZ_SESSION_SECRET="$(openssl rand -hex 32)"
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
 DATABASE_URL=postgresql+asyncpg://straz:silne_db_heslo_123@postgres:5432/straz
 REDIS_URL=redis://redis:6379/0
 ```
@@ -146,5 +146,5 @@ Po prepojení otestujte:
 2. **Web Prihlásenie:**
    - Otvorte [https://straz-monitoring.vercel.app](https://straz-monitoring.vercel.app).
    - Už sa nezobrazí žiadna 404 chyba!
-   - Zadajte `erikbabcan@gmail.com` a `heslo`.
+   - Zadajte `admin@example.invalid` a `heslo`.
    - Prihlásenie prebehne úspešne a ste priamo v systéme bez nutnosti lokálneho počítača.

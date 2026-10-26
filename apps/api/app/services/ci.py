@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import uuid
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Finding, FindingSeverity, FindingStatus, ScanRun, ScanRunFinding
+from app.models import RunStatus, ScanRun, ScanRunFinding
 
 
 async def evaluate_ci_gate(
@@ -18,7 +16,12 @@ async def evaluate_ci_gate(
     Evaluates findings associated with the given scan run or app.
     Returns (passed, summary_counts, failure_reason).
     """
-    # 1. Check scan_run_findings first if populated
+    empty = {"critical": 0, "high": 0, "medium": 0, "total_new": 0}
+    if run.status != RunStatus.done or not run.observations_complete:
+        return False, empty, "Sken nemá úplné a overené výsledky"
+    if fail_on not in {"critical", "high", "medium"}:
+        return False, empty, "Neplatný prah zlyhania"
+    # Only immutable per-run observations are evidence for a CI gate.
     stmt = (
         select(
             ScanRunFinding.observed_severity,
@@ -30,24 +33,12 @@ async def evaluate_ci_gate(
     res = (await db.execute(stmt)).all()
     counts = {row[0].lower(): row[1] for row in res}
 
-    # If scan_run_findings is empty, fallback to open findings for the app
-    if not counts:
-        stmt_findings = (
-            select(Finding.severity, func.count(Finding.id))
-            .where(
-                Finding.app_id == run.app_id,
-                Finding.status == FindingStatus.open,
-            )
-            .group_by(Finding.severity)
-        )
-        res_findings = (await db.execute(stmt_findings)).all()
-        counts = {row[0].value.lower(): row[1] for row in res_findings}
-
     critical = counts.get("critical", 0)
     high = counts.get("high", 0)
     medium = counts.get("medium", 0)
-    low = counts.get("low", 0)
-    total_new = critical + high + medium + low
+    total_new = await db.scalar(select(func.count()).select_from(ScanRunFinding).where(
+        ScanRunFinding.scan_run_id == run.id, ScanRunFinding.is_new.is_(True)
+    )) or 0
 
     summary = {
         "critical": critical,

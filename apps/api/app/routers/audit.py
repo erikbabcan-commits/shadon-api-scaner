@@ -7,16 +7,15 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import OrgContext, require_org_role
-from app.models import AuditEvent, OrganizationMember, OrgRole
-from app.services.audit import write_audit_log
+from app.models import AuditEvent, OrgRole
 
 router = APIRouter(prefix="/api/orgs/{org_id}", tags=["audit"])
 
@@ -55,7 +54,7 @@ def sanitize_csv_cell(val: Any) -> str:
     if val is None:
         return ""
     text_val = str(val)
-    if text_val and text_val[0] in ("=", "+", "-", "@"):
+    if text_val.lstrip(" \t\r\n\ufeff").startswith(("=", "+", "-", "@")) or text_val.startswith(("\t", "\r", "\n")):
         return f"'{text_val}"
     return text_val
 
@@ -180,7 +179,7 @@ async def export_audit_logs_csv(
 
     output.seek(0)
     now_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    filename = f"straz_audit_log_{org_ctx.organization.slug}_{now_str}.csv"
+    filename = f"straz_audit_log_{now_str}.csv"
 
     return StreamingResponse(
         iter([output.getvalue()]),

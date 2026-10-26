@@ -1,16 +1,13 @@
 """Database migration helper to run Alembic programmatically or via CLI."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
 
 from app.config import get_settings
-from app.db import engine
 
 logger = logging.getLogger("straz.migrations")
 

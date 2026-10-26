@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type AuditLogItem, type Organization } from "../lib/api";
+import { api, getActiveOrgId, type AuditLogItem, type Organization } from "../lib/api";
 
 const CATEGORIES = [
   { label: "Všetky", filter: "" },
@@ -55,8 +55,9 @@ export function AuditLogPage() {
       try {
         const orgs = await api.getOrgs();
         if (orgs.length > 0) {
-          setCurrentOrg(orgs[0]);
-          await loadLogs(orgs[0].id);
+          const active = orgs.find((org) => org.id === getActiveOrgId()) ?? orgs[0];
+          setCurrentOrg(active);
+          if (active.role === "owner" || active.role === "admin") await loadLogs(active.id);
         }
       } catch {
         /* ignore */
@@ -81,7 +82,7 @@ export function AuditLogPage() {
     ? events.filter((e) => e.action.includes(selectedCategory))
     : events;
 
-  const isViewer = currentOrg?.role === "viewer";
+  const isViewer = currentOrg?.role !== "owner" && currentOrg?.role !== "admin";
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">

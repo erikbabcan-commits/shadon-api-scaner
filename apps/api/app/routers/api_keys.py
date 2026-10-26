@@ -65,6 +65,7 @@ async def list_keys(
 async def create_key(
     org_id: uuid.UUID,
     body: ApiKeyCreate,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.admin)),
 ) -> ApiKeyCreatedResponse:
@@ -79,6 +80,7 @@ async def create_key(
             headers={"X-Upgrade-Required": "true"},
         )
 
+    response.headers["Cache-Control"] = "no-store"
     api_key, raw_token = await create_api_key(
         db=db,
         org=org_ctx.organization,

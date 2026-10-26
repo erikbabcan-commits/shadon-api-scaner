@@ -117,7 +117,7 @@ npm run dev
 * **Frontend konzola:** [http://localhost:5173](http://localhost:5173)
 * **Backend API Swagger:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 * **Predvolený administrátorský účet:**
-  * **Email:** `erikbabcan@gmail.com`
+  * **Email:** `admin@example.invalid`
   * **Heslo:** `heslo`
 
 ---
@@ -132,9 +132,9 @@ DATABASE_URL=sqlite+aiosqlite:///./straz.db
 REDIS_URL=redis://localhost:6379/0
 
 # Administrátorský prístup
-STRAZ_ADMIN_EMAIL=erikbabcan@gmail.com
+STRAZ_ADMIN_EMAIL=admin@example.invalid
 STRAZ_ADMIN_PASSWORD=heslo
-STRAZ_SESSION_SECRET=dev-session-secret-must-be-at-least-32-chars-long!
+STRAZ_SESSION_SECRET="$(openssl rand -hex 32)"
 STRAZ_COOKIE_SECURE=false
 
 # CORS & Routing
@@ -151,14 +151,14 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ```ini
 POSTGRES_USER=straz
-POSTGRES_PASSWORD=silne_unikatne_heslo_min_16_znakov
+POSTGRES_PASSWORD="$(openssl rand -hex 32)"
 POSTGRES_DB=straz
 DATABASE_URL=postgresql+asyncpg://straz:silne_unikatne_heslo_min_16_znakov@postgres:5432/straz
 REDIS_URL=redis://redis:6379/0
 
-STRAZ_ADMIN_EMAIL=erikbabcan@gmail.com
+STRAZ_ADMIN_EMAIL=admin@example.invalid
 STRAZ_ADMIN_PASSWORD=silne_admin_heslo
-STRAZ_SESSION_SECRET=dlhy_kryptograficky_retazec_aspon_64_znakov
+STRAZ_SESSION_SECRET="$(openssl rand -hex 32)"
 STRAZ_COOKIE_SECURE=true
 STRAZ_ENV=production
 

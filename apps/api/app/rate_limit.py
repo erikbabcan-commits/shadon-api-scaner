@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import defaultdict, deque
-from typing import Any
 
 from fastapi import HTTPException, Request, Response, status
 import redis.asyncio as aioredis
@@ -89,19 +88,17 @@ class RateLimiter:
                 response.headers["X-RateLimit-Reset"] = str(ttl)
             return
 
-        remaining: int
-        ttl: int
-
         try:
             r = get_redis_client()
             # Atomic counter + expiry: no worker can leave an unbounded counter
             # between INCR and EXPIRE, and all instances share the same budget.
-            current_hits, ttl = await r.eval(
+            current_hits, ttl = await r.execute_command(
+                "EVAL",
                 "local hits = redis.call('INCR', KEYS[1]); "
                 "local ttl = redis.call('TTL', KEYS[1]); "
                 "if ttl < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]); ttl = tonumber(ARGV[1]); end; "
                 "return {hits, ttl}",
-                1, full_key, window,
+                1, full_key, str(window),
             )
             ttl = max(1, int(ttl))
 
@@ -153,9 +150,7 @@ run_limiter = RateLimiter(limit=30, window_seconds=60)
 
 
 def client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # The ASGI peer may be rewritten only by explicitly trusted proxy middleware.
     if request.client:
         return request.client.host
     return "unknown"

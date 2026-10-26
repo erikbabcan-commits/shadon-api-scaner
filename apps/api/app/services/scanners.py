@@ -4,12 +4,14 @@ import asyncio
 import json
 import re
 import shutil
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 
 import httpx
+from app.services.safe_http import public_http_client, validate_public_url, resolve_public_addresses
 
 
 class _TitleParser(HTMLParser):
@@ -61,14 +63,21 @@ def which(bin_name: str) -> str | None:
                 except OSError:
                     pass
             return found
-    return None
+    raise RuntimeError(f"Required scanner is not installed: {bin_name}")
 
 
 async def run_heartbeat(url: str, timeout: float = 10.0) -> HeartbeatResult:
     started = datetime.now(timezone.utc)
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            resp = await client.get(url)
+        async with asyncio.timeout(timeout), public_http_client(timeout=timeout) as client:
+            async with client.stream("GET", url) as response:
+                content = b""
+                async for chunk in response.aiter_bytes():
+                    content += chunk
+                    if len(content) >= 200_000:
+                        content = content[:200_000]
+                        break
+                resp = httpx.Response(response.status_code, content=content)
             latency = (datetime.now(timezone.utc) - started).total_seconds() * 1000
             parser = _TitleParser()
             try:
@@ -82,8 +91,8 @@ async def run_heartbeat(url: str, timeout: float = 10.0) -> HeartbeatResult:
                 latency_ms=round(latency, 2),
                 title=title,
             )
-    except httpx.HTTPError as exc:
-        return HeartbeatResult(ok=False, status_code=None, latency_ms=None, title=None, error=str(exc))
+    except (httpx.HTTPError, ValueError, OSError, TimeoutError):
+        return HeartbeatResult(ok=False, status_code=None, latency_ms=None, title=None, error="Target unavailable or blocked")
 
 
 async def _run_cmd(args: list[str], timeout: float = 120.0) -> tuple[int, str, str]:
@@ -91,14 +100,18 @@ async def _run_cmd(args: list[str], timeout: float = 120.0) -> tuple[int, str, s
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env={key: value for key, value in os.environ.items() if key in {"PATH", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"}},
     )
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except TimeoutError:
         proc.kill()
         await proc.communicate()
-        return 124, "", "timeout"
-    return proc.returncode or 0, stdout.decode("utf-8", errors="replace"), stderr.decode(
+        raise RuntimeError("Scanner timed out") from None
+    code = proc.returncode or 0
+    if code not in (0, 1) or (code == 1 and Path(args[0]).name != "gitleaks"):
+        raise RuntimeError(f"Scanner process failed (exit {code})")
+    return code, stdout.decode("utf-8", errors="replace"), stderr.decode(
         "utf-8", errors="replace"
     )
 
@@ -139,7 +152,7 @@ async def run_tlsx(host: str) -> list[ToolFinding]:
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
-            continue
+            raise RuntimeError("Malformed scanner JSON output") from None
         expired = bool(data.get("expired"))
         mismatch = bool(data.get("mismatch"))
         not_after = data.get("not_after") or data.get("notAfter")
@@ -208,7 +221,6 @@ async def run_httpx_probe(url: str) -> list[ToolFinding]:
             "-status-code",
             "-title",
             "-tech-detect",
-            "-follow-redirects",
         ],
         timeout=90,
     )
@@ -230,7 +242,7 @@ async def run_httpx_probe(url: str) -> list[ToolFinding]:
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
-            continue
+            raise RuntimeError("Malformed scanner JSON output") from None
         status = data.get("status_code") or data.get("status-code")
         techs = data.get("tech") or data.get("technologies") or []
         if isinstance(techs, str):
@@ -311,7 +323,7 @@ async def run_nuclei_safe(url: str, work_dir: Path | None = None) -> list[ToolFi
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
-            continue
+            raise RuntimeError("Malformed scanner JSON output") from None
         info = data.get("info") or {}
         name = info.get("name") or data.get("template-id") or "nuclei finding"
         severity = (info.get("severity") or "info").lower()
@@ -430,11 +442,13 @@ async def run_naabu(host: str, ports: str) -> list[ToolFinding]:
 
 
 async def git_clone(url: str, dest: Path, timeout: float = 300.0) -> tuple[bool, str]:
+    parsed = validate_public_url(url, https_only=True)
+    await resolve_public_addresses(parsed.host, parsed.port or 443)
     if dest.exists():
         shutil.rmtree(dest, ignore_errors=True)
     dest.parent.mkdir(parents=True, exist_ok=True)
     code, _out, err = await _run_cmd(
-        ["git", "clone", "--depth", "1", url, str(dest)],
+        ["git", "-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never", "-c", "core.hooksPath=/dev/null", "-c", "http.followRedirects=false", "clone", "--depth", "1", "--", url, str(dest)],
         timeout=timeout,
     )
     if code != 0:
@@ -444,7 +458,6 @@ async def git_clone(url: str, dest: Path, timeout: float = 300.0) -> tuple[bool,
 
 async def run_trivy_fs(path: Path) -> list[ToolFinding]:
     binary = which("trivy")
-    findings: list[ToolFinding] = []
     if not binary:
         return [
             ToolFinding(
@@ -471,6 +484,12 @@ async def run_trivy_fs(path: Path) -> list[ToolFinding]:
 
 
 async def run_trivy_image(image: str) -> list[ToolFinding]:
+    from app.schemas import _validate_safe_image_ref
+    _validate_safe_image_ref(image)
+    registry = image.split("/", 1)[0]
+    if "/" in image and ("." in registry or ":" in registry):
+        destination = validate_public_url(f"https://{registry}")
+        await resolve_public_addresses(destination.host, destination.port or 443)
     binary = which("trivy")
     if not binary:
         return [
@@ -499,6 +518,8 @@ async def run_trivy_image(image: str) -> list[ToolFinding]:
 
 def _parse_trivy_json(out: str, err: str, code: int, source_key: str) -> list[ToolFinding]:
     findings: list[ToolFinding] = []
+    if code != 0 or not out.strip():
+        raise RuntimeError("Trivy did not produce complete results")
     if not out.strip():
         if code not in (0, 1):
             findings.append(
@@ -513,7 +534,9 @@ def _parse_trivy_json(out: str, err: str, code: int, source_key: str) -> list[To
     try:
         data = json.loads(out)
     except json.JSONDecodeError:
-        return findings
+        raise RuntimeError("Malformed Trivy results") from None
+    if not isinstance(data, dict) or "Results" not in data:
+        raise RuntimeError("Incomplete Trivy results")
 
     results = data.get("Results") if isinstance(data, dict) else None
     if results is None and isinstance(data, list):
@@ -579,7 +602,7 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
             "--report-path",
             str(report),
             "--no-git",
-            "-v",
+            "--redact",
         ],
         timeout=600,
     )
@@ -599,7 +622,7 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
     try:
         data = json.loads(report.read_text(encoding="utf-8", errors="replace"))
     except json.JSONDecodeError:
-        data = []
+        raise RuntimeError("Malformed Gitleaks results") from None
     finally:
         try:
             report.unlink(missing_ok=True)
@@ -607,7 +630,7 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
             pass
 
     if not isinstance(data, list):
-        data = []
+        raise RuntimeError("Incomplete Gitleaks results")
 
     for item in data:
         rule = item.get("RuleID") or item.get("Description") or "secret"
@@ -701,7 +724,7 @@ async def run_secrets_sast(path: Path) -> list[ToolFinding]:
     target_files = [
         p
         for p in path.rglob("*")
-        if p.is_file()
+        if p.is_file() and not p.is_symlink() and p.stat().st_size <= 1_000_000
         and not any(
             part.startswith(".") or part in {"node_modules", "venv", ".venv", "dist", "build"}
             for part in p.parts

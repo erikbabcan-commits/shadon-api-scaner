@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonTable } from "@/components/Skeleton";
-import { api, buildApiUrl, Run } from "@/lib/api";
+import { api, buildApiUrl, getActiveOrgId, Run } from "@/lib/api";
 import { formatDate, formatTimeAgo } from "@/lib/format";
 
 export function RunsPage() {
@@ -23,8 +23,9 @@ export function RunsPage() {
 
   useEffect(() => {
     let es: EventSource | null = null;
+    const orgId = getActiveOrgId();
     try {
-      es = new EventSource(buildApiUrl("/api/runs/stream"), {
+      es = new EventSource(buildApiUrl(`/api/runs/stream${orgId ? `?organization_id=${encodeURIComponent(orgId)}` : ""}`), {
         withCredentials: true,
       });
       es.onmessage = (event) => {

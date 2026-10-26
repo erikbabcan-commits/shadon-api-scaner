@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -27,21 +27,21 @@ router = APIRouter(tags=["integrations"])
 
 class ChannelCreateRequest(BaseModel):
     app_id: uuid.UUID | None = None
-    platform: str
+    platform: Literal["slack", "discord", "teams", "webhook", "ntfy"]
     name: str = Field(min_length=1, max_length=100)
     destination_url: str = Field(min_length=1, max_length=500)
-    secret_token: str | None = None
-    min_severity: str = "high"
-    events: list[str] = ["finding.created", "app.down"]
+    secret_token: str | None = Field(default=None, max_length=255)
+    min_severity: Literal["info", "low", "medium", "high", "critical"] = "high"
+    events: list[Literal["finding.created", "app.down", "cert.expiring", "all"]] = ["finding.created", "app.down"]
     is_active: bool = True
 
 
 class ChannelUpdateRequest(BaseModel):
-    name: str | None = None
-    destination_url: str | None = None
-    secret_token: str | None = None
-    min_severity: str | None = None
-    events: list[str] | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    destination_url: str | None = Field(default=None, min_length=1, max_length=500)
+    secret_token: str | None = Field(default=None, max_length=255)
+    min_severity: Literal["info", "low", "medium", "high", "critical"] | None = None
+    events: list[Literal["finding.created", "app.down", "cert.expiring", "all"]] | None = None
     is_active: bool | None = None
 
 
@@ -154,6 +154,8 @@ async def update_channel(
     if body.is_active is not None:
         channel.is_active = body.is_active
 
+    validate_channel_for_plan(org_ctx.organization, channel.platform, bool(channel.secret_token))
+
     await write_audit(
         db,
         action="channel.update",
@@ -218,4 +220,7 @@ async def test_channel(
         entity_id=str(channel.id),
         detail=f"Test delivery status: {delivered}",
     )
-    return {"status": "ok" if delivered else "delivery_failed", "delivered": delivered}
+    await db.commit()
+    if not delivered:
+        raise HTTPException(status_code=400, detail="Channel delivery failed")
+    return {"status": "ok", "delivered": True}

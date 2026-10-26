@@ -92,8 +92,11 @@ async def test_alert_channel_crud_and_plans(
 
 @pytest.mark.asyncio
 async def test_webhook_hmac_and_test_dispatch(
-    client: AsyncClient, db_session: AsyncSession
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
+    async def delivered(*args, **kwargs):
+        return True
+    monkeypatch.setattr("app.routers.integrations.test_channel_delivery", delivered)
     settings = get_settings()
 
     user = User(

@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Finding, FindingSeverity, FindingSource, FindingStatus
-from app.services.ntfy import send_ntfy
+from app.models import App, Finding, FindingSeverity, FindingSource, FindingStatus, ScanRunFinding
+from app.services.notifications import dispatch_alert
 
 
 def make_fingerprint(*parts: str) -> str:
@@ -34,16 +34,15 @@ async def upsert_finding(
     now = datetime.now(timezone.utc)
     if existing:
         existing.last_seen_at = now
+        existing.severity = severity
+        existing.title = title
+        existing.detail = detail
+        await _record_observation(db, existing, False)
         if existing.status == FindingStatus.fixed:
             existing.status = FindingStatus.open
             existing.closed_at = None
-            if notify and severity in (FindingSeverity.high, FindingSeverity.critical):
-                await send_ntfy(
-                    f"Stráž: {severity.value} nález",
-                    f"{title}\n{detail or ''}",
-                    priority=5 if severity == FindingSeverity.critical else 4,
-                    tags="rotating_light",
-                )
+            if notify:
+                await _enqueue_finding_alert(db, existing)
         return existing
 
     finding = Finding(
@@ -59,14 +58,31 @@ async def upsert_finding(
         last_seen_at=now,
     )
     db.add(finding)
-    if notify and severity in (FindingSeverity.high, FindingSeverity.critical):
-        await send_ntfy(
-            f"Stráž: {severity.value} nález",
-            f"{title}\n{detail or ''}",
-            priority=5 if severity == FindingSeverity.critical else 4,
-            tags="rotating_light",
-        )
+    await db.flush()
+    await _record_observation(db, finding, True)
+    if notify:
+        await _enqueue_finding_alert(db, finding)
     return finding
+
+
+async def _enqueue_finding_alert(db: AsyncSession, finding: Finding) -> None:
+    app = await db.get(App, finding.app_id)
+    if app is None or app.organization_id is None:
+        return
+    event_type = "cert.expiring" if finding.source == FindingSource.tls and "expir" in finding.title.lower() else "finding.created"
+    await dispatch_alert(db, app.organization_id, event_type, finding.severity.value, finding.title, finding.detail, app)
+
+
+async def _record_observation(db: AsyncSession, finding: Finding, is_new: bool) -> None:
+    run_id = db.info.get("scan_run_id")
+    if run_id is None:
+        return
+    observation = await db.get(ScanRunFinding, (run_id, finding.id))
+    if observation is None:
+        db.add(ScanRunFinding(scan_run_id=run_id, finding_id=finding.id,
+            observed_severity=finding.severity.value, is_new=is_new))
+    else:
+        observation.observed_severity = finding.severity.value
 
 
 async def mark_absent_fixed(

@@ -28,7 +28,7 @@ from app.routers.findings import _invalidate_overview_cache
 logger = logging.getLogger("straz.worker")
 from app.services.findings import make_fingerprint, mark_absent_fixed, upsert_finding
 from app.services.internetdb import fetch_internetdb, resolve_public_ips
-from app.services.ntfy import send_ntfy
+from app.services.notifications import dispatch_alert, process_alert_outbox
 from app.services.scanners import (
     git_clone,
     run_gitleaks,
@@ -44,6 +44,7 @@ from app.services.scanners import (
     run_whois_rdap,
 )
 from app.services.verify import extract_hostname
+from app.services.safe_http import validate_public_url, resolve_public_addresses
 
 
 HEAVY_PROFILES = {
@@ -84,8 +85,8 @@ async def execute_scan_run(ctx, run_id: str) -> None:
     rid = uuid.UUID(run_id)
 
     async with SessionLocal() as db:
-        run = await db.get(ScanRun, rid)
-        if not run:
+        run = await db.scalar(select(ScanRun).where(ScanRun.id == rid).with_for_update())
+        if not run or run.status != RunStatus.queued:
             return
         profile = run.profile
         app = await db.scalar(
@@ -97,8 +98,22 @@ async def execute_scan_run(ctx, run_id: str) -> None:
             return
 
         verified = [t for t in app.targets if t.status == TargetStatus.verified]
+        if settings.is_production and any(t.trusted_private for t in verified):
+            await _set_run(db, rid, RunStatus.failed, "Private targets require an isolated worker")
+            await db.commit()
+            return
         if not verified and profile != ScanProfile.heartbeat:
             await _set_run(db, rid, RunStatus.failed, "no verified targets")
+            await db.commit()
+            return
+
+        try:
+            for target in verified:
+                value = target.host if "://" in target.host else f"https://{target.host}"
+                url = validate_public_url(value)
+                await resolve_public_addresses(url.host, url.port or 443)
+        except (ValueError, OSError, TimeoutError):
+            await _set_run(db, rid, RunStatus.failed, "Target is unavailable or non-public")
             await db.commit()
             return
 
@@ -121,6 +136,7 @@ async def execute_scan_run(ctx, run_id: str) -> None:
         await db.commit()
 
         try:
+            db.info["scan_run_id"] = rid
             if profile == ScanProfile.heartbeat:
                 await _heartbeat(db, app)
             elif profile == ScanProfile.tls:
@@ -146,24 +162,23 @@ async def execute_scan_run(ctx, run_id: str) -> None:
                 await db.commit()
                 return
 
+            run.observations_complete = True
             await _set_run(db, rid, RunStatus.done)
             await db.commit()
-            await _invalidate_overview_cache(settings)
+            await _invalidate_overview_cache(settings, app.organization_id)
             logger.info("Scan run %s completed successfully (app=%s)", run_id, app.name)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Scan run %s failed: %s", run_id, exc)
+            logger.error("Scan run %s failed (error_type=%s)", run_id, type(exc).__name__)
             await db.rollback()
             async with SessionLocal() as db2:
-                await _set_run(db2, rid, RunStatus.failed, str(exc)[:2000])
+                await _set_run(db2, rid, RunStatus.failed, "Scanner execution failed")
                 await db2.commit()
         finally:
             if heavy and lock_token:
-                current = await redis.get(settings.heavy_scan_lock_key)
-                if isinstance(current, bytes):
-                    current = current.decode()
-                if current == run_id:
-                    await redis.delete(settings.heavy_scan_lock_key)
-                    logger.debug("Released heavy scan lock for run %s", run_id)
+                await redis.eval(
+                    "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+                    1, settings.heavy_scan_lock_key, run_id,
+                )
 
 
 async def _heartbeat(db, app: App) -> None:
@@ -186,13 +201,9 @@ async def _heartbeat(db, app: App) -> None:
             fingerprint=make_fingerprint("heartbeat-down", str(app.id)),
             notify=True,
         )
-        if prev_up is True:
-            await send_ntfy(
-                f"Stráž: {app.name} down",
-                result.error or f"HTTP {result.status_code}",
-                priority=5,
-                tags="x",
-            )
+        if prev_up is not False and app.organization_id:
+            await dispatch_alert(db, app.organization_id, "app.down", "critical", f"App down: {app.name}", result.error or "HTTP availability failure", app)
+
     else:
         await mark_absent_fixed(
             db,
@@ -239,7 +250,7 @@ async def _tls(db, app: App, targets) -> None:
 
 async def _http(db, app: App, targets) -> None:
     seen: set[str] = set()
-    urls = {app.base_url}
+    urls = {app.base_url} if extract_hostname(app.base_url) in {extract_hostname(t.host) for t in targets} else set()
     for target in targets:
         h = target.host
         if not h.startswith("http"):
@@ -268,7 +279,7 @@ async def _http(db, app: App, targets) -> None:
 
 async def _nuclei(db, app: App, targets) -> None:
     seen: set[str] = set()
-    urls = {app.base_url}
+    urls = {app.base_url} if extract_hostname(app.base_url) in {extract_hostname(t.host) for t in targets} else set()
     for target in targets:
         h = target.host
         if not h.startswith("http"):
@@ -480,56 +491,59 @@ async def _gitleaks(db, app: App) -> None:
     )
 
 
+async def _schedule_profile(ctx, db, app: App, profile: ScanProfile) -> None:
+    from app.models import Organization
+    from app.services.quota import check_scan_quota, record_scan_admission
+    from app.services.audit import write_audit_log
+    if app.organization_id is None:
+        return
+    org = await db.get(Organization, app.organization_id)
+    if org is None:
+        return
+    allowed, _ = await check_scan_quota(db, org, profile)
+    if not allowed:
+        await db.rollback()
+        return
+    app_id, org_id = app.id, org.id
+    run = ScanRun(id=uuid.uuid4(), app_id=app_id, profile=profile, status=RunStatus.queued)
+    db.add(run)
+    await record_scan_admission(db, org_id)
+    await write_audit_log(db, org_id=org_id, action="scan.trigger", entity_type="scan_run", entity_id=str(run.id), details={"trigger": "scheduler", "profile": profile.value})
+    await db.commit()
+    try:
+        await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
+    except Exception:
+        run.status = RunStatus.failed
+        run.error = "Scan queue unavailable"
+        await db.commit()
+
+
 async def heartbeat_all(ctx) -> None:
     async with SessionLocal() as db:
-        apps = (await db.scalars(select(App).where(App.heartbeat_enabled.is_(True)))).all()
-        for app in apps:
-            run = ScanRun(app_id=app.id, profile=ScanProfile.heartbeat, status=RunStatus.queued)
-            db.add(run)
-            await db.flush()
-            await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
-        await db.commit()
+        ids = list(await db.scalars(select(App.id).where(App.heartbeat_enabled.is_(True))))
+        for app_id in ids:
+            app = await db.get(App, app_id)
+            if app:
+                await _schedule_profile(ctx, db, app, ScanProfile.heartbeat)
 
 
 async def nuclei_weekly_all(ctx) -> None:
     async with SessionLocal() as db:
-        apps = (await db.scalars(select(App).where(App.safe_enabled.is_(True)))).all()
-        for app in apps:
-            run = ScanRun(app_id=app.id, profile=ScanProfile.safe, status=RunStatus.queued)
-            db.add(run)
-            await db.flush()
-            await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
-        await db.commit()
+        ids = list(await db.scalars(select(App.id).where(App.safe_enabled.is_(True))))
+        for app_id in ids:
+            app = await db.get(App, app_id)
+            if app:
+                await _schedule_profile(ctx, db, app, ScanProfile.safe)
 
 
 async def supply_chain_weekly_all(ctx) -> None:
     async with SessionLocal() as db:
-        apps = (
-            await db.scalars(
-                select(App).where(
-                    (App.trivy_enabled.is_(True) & App.git_url.is_not(None))
-                    | (App.trivy_enabled.is_(True) & App.image_ref.is_not(None))
-                    | (App.gitleaks_enabled.is_(True) & App.git_url.is_not(None))
-                )
-            )
-        ).all()
-        for app in apps:
-            if app.trivy_enabled and app.git_url:
-                run = ScanRun(app_id=app.id, profile=ScanProfile.trivy_fs, status=RunStatus.queued)
-                db.add(run)
-                await db.flush()
-                await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
-            if app.trivy_enabled and app.image_ref:
-                run = ScanRun(app_id=app.id, profile=ScanProfile.trivy_image, status=RunStatus.queued)
-                db.add(run)
-                await db.flush()
-                await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
-            if app.gitleaks_enabled and app.git_url:
-                run = ScanRun(app_id=app.id, profile=ScanProfile.gitleaks, status=RunStatus.queued)
-                db.add(run)
-                await db.flush()
-                await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
-        await db.commit()
+        ids = list(await db.scalars(select(App.id)))
+        for app_id in ids:
+            for profile, flag, source in ((ScanProfile.trivy_fs, "trivy_enabled", "git_url"), (ScanProfile.trivy_image, "trivy_enabled", "image_ref"), (ScanProfile.gitleaks, "gitleaks_enabled", "git_url")):
+                app = await db.get(App, app_id)
+                if app and getattr(app, flag) and getattr(app, source):
+                    await _schedule_profile(ctx, db, app, profile)
 
 
 def _parse_cron(expr: str, fn):
@@ -577,6 +591,7 @@ class WorkerSettings:
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     cron_jobs = [
+        cron(process_alert_outbox, minute=set(range(60))),
         cron(heartbeat_all, minute={i for i in range(0, 60, max(1, settings.heartbeat_interval_minutes))}),
         _parse_cron(settings.nuclei_weekly_cron, nuclei_weekly_all),
         _parse_cron(settings.supply_chain_weekly_cron, supply_chain_weekly_all),

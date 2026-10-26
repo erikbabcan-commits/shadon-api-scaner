@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AlertChannel, Organization
-from app.services.quota import get_plan_config, get_plan_tier
+from app.services.quota import get_plan_config, get_plan_tier, lock_organization
 
 
 def mask_sensitive_url(url: str) -> str:
@@ -56,6 +56,7 @@ def validate_channel_for_plan(org: Organization, platform: str, has_secret: bool
 
 
 async def check_channel_limit(db: AsyncSession, org: Organization) -> None:
+    await lock_organization(db, org)
     plan = get_plan_config(org)
     max_channels = plan.get("max_alert_channels", 1)
 
