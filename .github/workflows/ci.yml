@@ -15,12 +15,16 @@ permissions:
 
 jobs:
   backend-tests:
-    name: Backend Pytest & Migrations
+    name: Backend Pytest & Migrations (PG ${{ matrix.postgres-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres-version: ["16", "18"]
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:${{ matrix.postgres-version }}-alpine
         env:
           POSTGRES_USER: straz
           POSTGRES_PASSWORD: straz_test_password
