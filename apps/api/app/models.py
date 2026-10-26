@@ -81,6 +81,25 @@ class ScanProfile(str, enum.Enum):
     gitleaks = "gitleaks"
 
 
+# External CLI scanners (tlsx/httpx/nuclei/subfinder/naabu/trivy/gitleaks/git)
+# resolve DNS and connect on their own, so the Python SSRF pinning does not
+# apply and no enforced, tested egress isolation exists yet (SECURITY_REVIEW
+# H13). They stay blocked everywhere until that isolation is delivered.
+CLI_SCANNER_PROFILES = frozenset(
+    {
+        ScanProfile.tls,
+        ScanProfile.http,
+        ScanProfile.safe,
+        ScanProfile.subdomain,
+        ScanProfile.ports,
+        ScanProfile.trivy_fs,
+        ScanProfile.trivy_image,
+        ScanProfile.gitleaks,
+    }
+)
+CLI_SCANNER_UNAVAILABLE = "Scan profile unavailable: external CLI scanners are disabled until network isolation is enforced"
+
+
 class RunStatus(str, enum.Enum):
     queued = "queued"
     running = "running"
@@ -382,7 +401,7 @@ class AuditEvent(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True

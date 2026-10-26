@@ -243,6 +243,7 @@ async def test_ci_incomplete_never_passes_and_observations_are_run_specific(db_s
     assert passed is False and counts["critical"] == 1 and counts["total_new"] == 1
 
 
+@pytest.mark.usefixtures("allow_cli_profiles")
 async def test_ci_queue_failure_is_not_accepted(auth_client, db_session, context, monkeypatch):
     async def unavailable(*args):
         raise OSError("queue offline")
@@ -301,6 +302,7 @@ async def test_branding_disallows_injection(auth_client, context):
 
 
 @pytest.mark.parametrize("critical", [False, True])
+@pytest.mark.usefixtures("allow_cli_profiles")
 async def test_ci_wait_true_clean_and_critical(auth_client, db_session, context, monkeypatch, critical):
     from app.services.findings import upsert_finding
     class CompletedQueue:

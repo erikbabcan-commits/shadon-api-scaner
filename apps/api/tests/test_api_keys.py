@@ -240,6 +240,7 @@ async def test_api_key_quotas_by_plan(client: AsyncClient, db_session: AsyncSess
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("allow_cli_profiles")
 async def test_ci_scan_gate_execution(client: AsyncClient, db_session: AsyncSession):
     settings = get_settings()
 

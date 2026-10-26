@@ -14,6 +14,8 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.logging import setup_logging
 from app.models import (
+    CLI_SCANNER_PROFILES,
+    CLI_SCANNER_UNAVAILABLE,
     App,
     FindingSeverity,
     FindingSource,
@@ -89,6 +91,10 @@ async def execute_scan_run(ctx, run_id: str) -> None:
         if not run or run.status != RunStatus.queued:
             return
         profile = run.profile
+        if profile in CLI_SCANNER_PROFILES:
+            await _set_run(db, rid, RunStatus.failed, CLI_SCANNER_UNAVAILABLE)
+            await db.commit()
+            return
         app = await db.scalar(
             select(App).where(App.id == run.app_id).options(selectinload(App.targets))
         )
@@ -495,7 +501,7 @@ async def _schedule_profile(ctx, db, app: App, profile: ScanProfile) -> None:
     from app.models import Organization
     from app.services.quota import check_scan_quota, record_scan_admission
     from app.services.audit import write_audit_log
-    if app.organization_id is None:
+    if app.organization_id is None or profile in CLI_SCANNER_PROFILES:
         return
     org = await db.get(Organization, app.organization_id)
     if org is None:
@@ -568,6 +574,8 @@ async def startup(ctx) -> None:
     settings = get_settings()
     setup_logging(settings.is_production)
     ctx["settings"] = settings
+    from app.migrations import assert_schema_at_head
+    await assert_schema_at_head()
     logger.info("ARQ Worker starting up...")
 
     binaries = ["nuclei", "tlsx", "httpx", "naabu", "subfinder", "trivy", "gitleaks"]

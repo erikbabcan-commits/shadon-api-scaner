@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.deps import OrgContext, require_org_role
-from app.models import App, OrgRole, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, OrganizationMember, User
+from app.models import CLI_SCANNER_PROFILES, CLI_SCANNER_UNAVAILABLE, App, OrgRole, RunStatus, ScanProfile, ScanRun, Target, TargetStatus, OrganizationMember, User
 from app.rate_limit import client_ip, run_limiter
 from app.schemas import RunCreate, RunOut
 from app.services.audit import write_audit
@@ -173,6 +173,8 @@ async def create_run(
         raise HTTPException(status_code=404, detail="App not found")
 
     profile = body.profile
+    if profile in CLI_SCANNER_PROFILES:
+        raise HTTPException(status_code=409, detail=CLI_SCANNER_UNAVAILABLE)
     flag = PROFILE_FLAGS.get(profile)
     if flag and not getattr(app, flag, True):
         raise HTTPException(status_code=400, detail=f"Profile {profile.value} disabled for app")

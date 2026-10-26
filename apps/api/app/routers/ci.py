@@ -17,6 +17,8 @@ from app.deps import OrgContext, get_current_user, get_current_org, require_scop
 from app.models import (
     App,
     RunStatus,
+    CLI_SCANNER_PROFILES,
+    CLI_SCANNER_UNAVAILABLE,
     ScanProfile,
     ScanRun,
     OrgRole,
@@ -85,6 +87,9 @@ async def ci_scan(
             status_code=400,
             detail="No verified targets found for app — domain verification required for CI gate",
         )
+
+    if body.profile in CLI_SCANNER_PROFILES:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=CLI_SCANNER_UNAVAILABLE)
 
     # 3. Check quota & profile
     allowed, reason = await check_scan_quota(db, org_ctx.organization, body.profile)

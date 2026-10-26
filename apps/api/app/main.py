@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.config import Settings, get_settings
 from app.db import SessionLocal, get_db
 from app.logging import setup_logging
-from app.migrations import apply_migrations_async
+from app.migrations import assert_schema_at_head
 from app.models import User
 from app.routers import (
     api_keys,
@@ -85,7 +85,7 @@ async def lifespan(_: FastAPI):
     logger.info("Initializing Stráž API (env=%s)...", settings.straz_env)
 
     validate_environment_security(settings)
-    await apply_migrations_async()
+    await assert_schema_at_head()
     await bootstrap_admin()
 
     yield
