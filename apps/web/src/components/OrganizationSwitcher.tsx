@@ -60,7 +60,7 @@ export function OrganizationSwitcher() {
         <select
           value={activeId || ""}
           onChange={handleSelect}
-          className="bg-slate-800 text-white text-xs font-medium py-1.5 px-3 pr-8 rounded-lg border border-slate-700 hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer appearance-none"
+          className="bg-white text-slate-800 text-xs font-semibold py-1.5 px-3 pr-8 rounded-lg border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer appearance-none shadow-xs"
         >
           {orgs.map((o) => (
             <option key={o.id} value={o.id}>
@@ -75,10 +75,10 @@ export function OrganizationSwitcher() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">Vytvoriť organizáciu</h3>
-            <p className="text-xs text-slate-400 mb-4">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Vytvoriť organizáciu</h3>
+            <p className="text-xs text-slate-500 mb-4">
               Zadajte názov nového tímu alebo pracovného priestoru.
             </p>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -88,20 +88,20 @@ export function OrganizationSwitcher() {
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
                 placeholder="Napr. CyberGuard Security s.r.o."
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                  className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800"
                 >
                   Zrušiť
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-1.5 text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-white rounded-lg transition disabled:opacity-50"
+                  className="px-4 py-1.5 text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition disabled:opacity-50"
                 >
                   {loading ? "Vytváram..." : "Vytvoriť"}
                 </button>

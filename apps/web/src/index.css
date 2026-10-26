@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   NATIVE MOBILE APP FEEL (Flutter-like Experience)
+   STRÁŽ — WHITE / LIGHT THEME DESIGN SYSTEM (Flutter / Native Mobile Feel)
    ========================================================================== */
 
 :root {
-  color-scheme: dark;
-  --bg: #0b1220;
-  --panel: #111827;
-  --border: #1f2937;
-  --text: #e5e7eb;
-  --muted: #94a3b8;
-  --accent: #38bdf8;
-  --danger: #f87171;
-  --ok: #34d399;
-  --warn: #fbbf24;
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-hover: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #0284c7;
+  --danger: #ef4444;
+  --ok: #10b981;
+  --warn: #f59e0b;
 }
 
-/* 1. Viewport & Body Lock (Rigid Viewport / No-bounce) */
+/* 1. Viewport & Body Lock (Rigid Viewport / Pure White Background) */
 html,
 body,
 #root {
@@ -28,8 +29,8 @@ body,
   padding: 0;
   overscroll-behavior-y: none;
   overscroll-behavior-x: none;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--bg) !important;
+  color: var(--text) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -48,7 +49,7 @@ body,
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 3. STRICT FORM INPUT EXCEPTION (Do NOT remove / break inputs) */
+/* 3. STRICT FORM INPUT EXCEPTION (Native paste, selection & editing preserved) */
 input,
 textarea,
 select,
@@ -58,6 +59,14 @@ select,
   -ms-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8 !important;
 }
 
 /* 4. Smooth Damped Scroll Container (Friction Scroll / No-flyaway) */
@@ -79,7 +88,7 @@ select,
   display: none;
 }
 
-/* 5. Safe Area Insets (iOS Notch / Dynamic Island / Home Indicator) */
+/* 5. Safe Area Insets (iOS Dynamic Island / Notch / Home Indicator) */
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }
@@ -95,7 +104,7 @@ select,
   padding-left: env(safe-area-inset-left, 0px);
 }
 
-/* 6. Native App Shell Layout */
+/* 6. Native App Shell Layout (Clean White Surfaces) */
 .app-shell {
   height: 100dvh;
   display: flex;
@@ -104,14 +113,7 @@ select,
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   overscroll-behavior: none;
-  background: var(--bg);
-}
-
-.tabbar {
-  flex: none;
-  border-top: 1px solid var(--border);
-  background: var(--panel);
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  background: var(--bg) !important;
 }
 
 .topbar {
@@ -122,21 +124,31 @@ select,
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
+  border-bottom: 1px solid var(--border) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(12px);
 }
 
-/* 7. Components & UI Elements */
+.tabbar {
+  flex: none;
+  border-top: 1px solid var(--border) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(16px);
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* 7. Components & UI Elements in White Theme */
 .card {
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
   border-radius: 0.75rem;
   padding: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 
 .btn {
   border: 1px solid var(--border);
-  background: #1e293b;
+  background: #f8fafc;
   color: var(--text);
   border-radius: 0.5rem;
   padding: 0.55rem 0.9rem;
@@ -156,43 +168,177 @@ select,
 }
 
 .btn-primary {
-  background: #0369a1;
-  border-color: #0284c7;
+  background: #0284c7 !important;
+  border-color: #0369a1 !important;
+  color: #ffffff !important;
 }
 
 .btn-primary:active {
-  background: #0284c7;
+  background: #0369a1 !important;
 }
 
 .input {
   width: 100%;
-  background: #0f172a;
-  border: 1px solid var(--border);
-  color: var(--text);
+  background: #ffffff !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
   border-radius: 0.5rem;
   padding: 0.6rem 0.75rem;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 0.1rem 0.55rem;
-  font-size: 0.75rem;
-  border: 1px solid var(--border);
+/* 8. Comprehensive White Mode Overrides for Tailwind Slate Utilities */
+.bg-slate-950 {
+  background-color: #ffffff !important;
 }
 
-.badge-ok {
-  color: var(--ok);
-  border-color: #065f46;
+.bg-slate-900,
+.bg-slate-900\/40,
+.bg-slate-900\/60,
+.bg-slate-900\/80 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
-.badge-down {
-  color: var(--danger);
-  border-color: #7f1d1d;
+.hover\:bg-slate-900\/80:hover,
+.hover\:bg-slate-800:hover,
+.hover\:bg-slate-900:hover {
+  background-color: #f8fafc !important;
 }
 
-.badge-warn {
-  color: var(--warn);
-  border-color: #92400e;
+.bg-slate-800,
+.bg-slate-800\/80,
+.bg-slate-800\/90 {
+  background-color: #f1f5f9 !important;
+}
+
+.border-slate-800,
+.border-slate-800\/80,
+.border-slate-800\/90,
+.border-slate-700,
+.border-slate-900 {
+  border-color: #e2e8f0 !important;
+}
+
+.border-slate-800\/50,
+.border-slate-700\/50 {
+  border-color: #f1f5f9 !important;
+}
+
+/* Text Hierarchy in White Theme */
+.text-slate-100,
+.text-slate-200,
+.text-slate-300 {
+  color: #0f172a !important;
+}
+
+.text-slate-400 {
+  color: #64748b !important;
+}
+
+.text-slate-500 {
+  color: #64748b !important;
+}
+
+.text-slate-600 {
+  color: #475569 !important;
+}
+
+/* Headings and Titles */
+h1.text-white,
+h2.text-white,
+h3.text-white,
+h4.text-white,
+strong.text-white,
+div.text-white,
+p.text-white {
+  color: #0f172a !important;
+}
+
+/* Keep white text on colored buttons */
+button.text-white,
+button .text-white,
+.btn-primary,
+.bg-sky-600,
+.bg-sky-500 {
+  color: #ffffff !important;
+}
+
+/* Colored Metric Cards (Gradients with soft pastel light backgrounds) */
+div[class*="from-rose-950"] {
+  background: linear-gradient(135deg, #fff1f2, #ffffff) !important;
+  border-color: #fecdd3 !important;
+}
+
+div[class*="from-amber-950"] {
+  background: linear-gradient(135deg, #fffbeb, #ffffff) !important;
+  border-color: #fde68a !important;
+}
+
+div[class*="from-sky-950"] {
+  background: linear-gradient(135deg, #f0f9ff, #ffffff) !important;
+  border-color: #bae6fd !important;
+}
+
+div[class*="from-emerald-950"] {
+  background: linear-gradient(135deg, #ecfdf5, #ffffff) !important;
+  border-color: #a7f3d0 !important;
+}
+
+/* Status Badges & Pills */
+.bg-rose-500\/10,
+.bg-rose-950\/30,
+.bg-rose-950\/20 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+.text-rose-400,
+.text-rose-300 {
+  color: #e11d48 !important;
+}
+
+.bg-amber-500\/10,
+.bg-amber-950\/30,
+.bg-amber-950\/20 {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+.text-amber-400,
+.text-amber-300 {
+  color: #d97706 !important;
+}
+
+.bg-orange-500\/10 {
+  background-color: #fff7ed !important;
+  border-color: #fed7aa !important;
+}
+.text-orange-400 {
+  color: #ea580c !important;
+}
+
+.bg-emerald-500\/10,
+.bg-emerald-950\/30 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+.text-emerald-400,
+.text-emerald-300 {
+  color: #059669 !important;
+}
+
+.bg-sky-500\/10,
+.bg-sky-950\/30 {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+}
+.text-sky-400,
+.text-sky-300 {
+  color: #0284c7 !important;
+}
+
+/* Modals & Dialogs */
+.bg-black\/60,
+.bg-black\/50 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(4px);
 }

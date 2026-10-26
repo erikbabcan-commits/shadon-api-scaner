@@ -132,23 +132,23 @@ export function AppShell({
   }, []);
 
   return (
-    <div className="app-shell min-h-screen flex flex-col bg-slate-950 text-slate-100 pb-20 md:pb-6">
-      <header className="topbar sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80">
+    <div className="app-shell min-h-screen flex flex-col bg-white text-slate-900 pb-20 md:pb-6">
+      <header className="topbar sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 group-hover:border-sky-400 transition">
+            <div className="w-8 h-8 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-600 group-hover:border-sky-400 transition">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
             </div>
-            <strong className="text-base font-bold tracking-tight text-white group-hover:text-sky-400 transition">
+            <strong className="text-base font-bold tracking-tight text-slate-900 group-hover:text-sky-600 transition">
               Stráž
             </strong>
           </Link>
-          <div className="text-xs text-slate-400 border-l border-slate-800 pl-3 hidden sm:block">
+          <div className="text-xs text-slate-500 border-l border-slate-200 pl-3 hidden sm:block">
             {runningScans > 0 ? (
-              <span className="flex items-center gap-1.5 text-sky-400">
-                <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
+              <span className="flex items-center gap-1.5 text-sky-600 font-medium">
+                <span className="w-2 h-2 rounded-full bg-sky-500 animate-ping" />
                 {runningScans} {runningScans === 1 ? "bežiaci scan" : "bežiace scany"}
               </span>
             ) : (
@@ -160,21 +160,21 @@ export function AppShell({
         <div className="flex items-center gap-3">
           <OrganizationSwitcher />
           {runningScans > 0 && (
-            <span className="sm:hidden flex items-center gap-1 text-xs text-sky-400 px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+            <span className="sm:hidden flex items-center gap-1 text-xs text-sky-700 px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
               {runningScans}
             </span>
           )}
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
               online
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-rose-50 text-rose-700 border-rose-200"
             }`}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                online ? "bg-emerald-400" : "bg-rose-400"
+                online ? "bg-emerald-500" : "bg-rose-500"
               }`}
             />
             {online ? "Online" : "Offline"}
@@ -186,19 +186,19 @@ export function AppShell({
         {children}
       </main>
 
-      <footer className="mt-auto border-t border-slate-900 py-3 px-4 text-center text-xs text-slate-500 hidden sm:block">
+      <footer className="mt-auto border-t border-slate-200 py-3 px-4 text-center text-xs text-slate-500 hidden sm:block bg-slate-50/50">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-slate-400 font-medium">Stráž Engine</span>
-            <span className="text-slate-700">•</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-slate-700 font-medium">Stráž Engine</span>
+            <span className="text-slate-300">•</span>
             <span>DB Latencia: {dbLatency !== null ? `${dbLatency}ms` : "1.2ms"}</span>
-            <span className="text-slate-700">•</span>
-            <Link to="/settings/audit-logs" className="text-slate-400 hover:text-sky-400 underline">
+            <span className="text-slate-300">•</span>
+            <Link to="/settings/audit-logs" className="text-slate-600 hover:text-sky-600 underline">
               Audit Log
             </Link>
           </div>
-          <div className="text-[11px] text-slate-600">
+          <div className="text-[11px] text-slate-500">
             Enterprise Observability & Health Probes Aktívne
           </div>
         </div>
@@ -206,7 +206,7 @@ export function AppShell({
 
       <nav
         aria-label="Hlavná navigácia"
-        className="tabbar fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/90 flex justify-around pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-1 md:py-2.5 max-w-lg md:max-w-xl mx-auto md:bottom-3 md:rounded-2xl md:border shadow-2xl shadow-black/80"
+        className="tabbar fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200 flex justify-around pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-1 md:py-2.5 max-w-lg md:max-w-xl mx-auto md:bottom-3 md:rounded-2xl md:border shadow-xl shadow-slate-200/60"
       >
         {tabs.map((tab) => {
           const active =
@@ -220,8 +220,8 @@ export function AppShell({
               aria-label={tab.label}
               className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl text-xs font-medium transition-all ${
                 active
-                  ? "text-sky-400 font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "text-sky-600 font-semibold"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
               {tab.icon(active)}
