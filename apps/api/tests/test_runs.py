@@ -7,6 +7,7 @@ from app.models import App, ScanProfile, Target, TargetStatus
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("allow_cli_profiles")
 async def test_run_creation_and_validation(auth_client: AsyncClient, db_session: AsyncSession, test_user):
     from sqlalchemy import select
     from app.models import OrganizationMember

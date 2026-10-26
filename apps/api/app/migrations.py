@@ -30,15 +30,30 @@ def run_upgrade_head() -> None:
     logger.info("Alembic upgrade head completed successfully.")
 
 
-async def apply_migrations_async() -> None:
-    """Ensure database schema is ready on startup without deadlocks."""
-    try:
-        from app.db import Base, engine
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database schema verified and ready.")
-    except Exception as exc:
-        logger.warning("Could not auto-apply schema: %s", exc)
+async def assert_schema_at_head() -> None:
+    """Fail closed unless the database is exactly at the Alembic head.
+
+    The API never creates or alters schema. Migrations run as a separate,
+    controlled step (``python -m app.migrations upgrade``) before start-up.
+    SQLite (unit tests only) is skipped.
+    """
+    from sqlalchemy import text
+
+    from app.db import engine
+
+    if engine.dialect.name == "sqlite":
+        return
+    from alembic.script import ScriptDirectory
+
+    expected = set(ScriptDirectory.from_config(get_alembic_config()).get_heads())
+    async with engine.connect() as conn:
+        try:
+            rows = (await conn.execute(text("SELECT version_num FROM alembic_version"))).scalars().all()
+        except Exception as exc:  # table missing / DB unreachable
+            raise RuntimeError("Database schema is not migrated; run migrations before starting the API") from exc
+    if set(rows) != expected:
+        raise RuntimeError("Database schema is not at Alembic head; run migrations before starting the API")
+    logger.info("Database schema is at Alembic head.")
 
 
 if __name__ == "__main__":

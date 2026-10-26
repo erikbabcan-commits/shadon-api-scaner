@@ -135,3 +135,14 @@ async def auth_client(
     token = create_session_token(settings, str(test_user.id), test_user.token_version)
     client.cookies.set(settings.straz_cookie_name, token)
     yield client
+
+
+@pytest.fixture
+def allow_cli_profiles(monkeypatch):
+    """Logic tests that exercise gating/quota with CLI profiles (scanners are mocked)."""
+    import app.routers.ci as ci_router
+    import app.routers.runs as runs_router
+    import app.worker as worker_mod
+
+    for mod in (ci_router, runs_router, worker_mod):
+        monkeypatch.setattr(mod, "CLI_SCANNER_PROFILES", frozenset())

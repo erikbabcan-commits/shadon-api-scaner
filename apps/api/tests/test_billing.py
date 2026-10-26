@@ -21,6 +21,7 @@ async def test_billing_plans_and_usage(client: AsyncClient, test_user: User):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("allow_cli_profiles")
 async def test_free_tier_app_limit_and_scan_quota(
     client: AsyncClient, db_session: AsyncSession
 ):
