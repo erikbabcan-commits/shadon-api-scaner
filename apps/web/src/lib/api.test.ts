@@ -1,11 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, buildApiUrl, request, setActiveOrgId } from "./api";
+import { api, request, setActiveOrgId } from "./api";
 import { formatDate, formatLatency, formatTimeAgo } from "./format";
 
 describe("API Helper Utilities", () => {
-  it("builds API URL correctly with paths", () => {
-    expect(buildApiUrl("/api/apps")).toBe("/api/apps");
-    expect(buildApiUrl("api/auth/me")).toBe("/api/auth/me");
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it.each([
+    { baseUrl: "", expected: "/api/apps" },
+    { baseUrl: "https://api.straz.example.com", expected: "https://api.straz.example.com/api/apps" },
+    { baseUrl: "https://api.straz.example.com///", expected: "https://api.straz.example.com/api/apps" },
+  ])("builds API URLs with VITE_API_URL='$baseUrl'", async ({ baseUrl, expected }) => {
+    // API_BASE_URL is captured at import time: load it after setting the environment.
+    vi.stubEnv("VITE_API_URL", baseUrl);
+    vi.resetModules();
+    const { buildApiUrl } = await import("./api");
+    expect(buildApiUrl("/api/apps")).toBe(expected);
+    expect(buildApiUrl("api/apps")).toBe(expected);
   });
 });
 
