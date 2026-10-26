@@ -34,20 +34,14 @@ def run_upgrade_head() -> None:
 
 
 async def apply_migrations_async() -> None:
-    """Apply migrations. If tables already exist without alembic_version, stamps or handles gracefully."""
-    # Run sync in thread pool to avoid blocking async event loop
-    loop = asyncio.get_running_loop()
+    """Ensure database schema is ready on startup without deadlocks."""
     try:
-        await loop.run_in_executor(None, run_upgrade_head)
-    except Exception as exc:
-        logger.warning(
-            "Programmatic alembic migration failed or DB already initialized (%s). Ensuring schema directly...",
-            exc,
-        )
-        from app.db import Base
-
+        from app.db import Base, engine
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema verified and ready.")
+    except Exception as exc:
+        logger.warning("Could not auto-apply schema: %s", exc)
 
 
 if __name__ == "__main__":
