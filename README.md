@@ -1,5 +1,16 @@
 # Stráž — Enterprise Bezpečnostný Monitoring & Audit Vlastných Aplikácií
 
+> **Aktuálny rozsah služby:** aktívne sú iba Heartbeat a InternetDB. Osem CLI profilov
+> (TLS, HTTP, Nuclei safe, Subdomain, Ports, Trivy FS/Image, Gitleaks) je zablokovaných
+> do doplnenia izolácie, vo všetkých plánoch aj CI/CD. Nižšie opísané implementované
+> funkcie nie sú dôkazom ich aktuálnej produkčnej dostupnosti.
+>
+> Railway projekt: **dev-new**. Vercel projekt: **straz-monitoring**. Commit pin,
+> DEMO stav a produkčné kontroly potvrdzuje operátor pri release.
+> Pozri [aktuálne poznámky](NOTION_NOTES.md), [incidentný postup](docs/INCIDENT_ROTATION_RUNBOOK.md)
+> a [prevádzkové overenie](docs/OPERATIONS_ACCEPTANCE.md).
+
+
 [![CI Pipeline](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml/badge.svg)](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB.svg)](https://react.dev)
@@ -118,7 +129,7 @@ npm run dev
 * **Backend API Swagger:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 * **Predvolený administrátorský účet:**
   * **Email:** `admin@example.invalid`
-  * **Heslo:** `heslo`
+  * **Heslo:** nastavte vlastné silné heslo; predvolené heslo nie je produkčná konfigurácia.
 
 ---
 
@@ -133,7 +144,7 @@ REDIS_URL=redis://localhost:6379/0
 
 # Administrátorský prístup
 STRAZ_ADMIN_EMAIL=admin@example.invalid
-STRAZ_ADMIN_PASSWORD=heslo
+STRAZ_ADMIN_PASSWORD=<set securely before use>
 STRAZ_SESSION_SECRET="$(openssl rand -hex 32)"
 STRAZ_COOKIE_SECURE=false
 
@@ -157,7 +168,7 @@ DATABASE_URL=postgresql+asyncpg://straz:silne_unikatne_heslo_min_16_znakov@postg
 REDIS_URL=redis://redis:6379/0
 
 STRAZ_ADMIN_EMAIL=admin@example.invalid
-STRAZ_ADMIN_PASSWORD=silne_admin_heslo
+STRAZ_ADMIN_PASSWORD=<set securely before use>
 STRAZ_SESSION_SECRET="$(openssl rand -hex 32)"
 STRAZ_COOKIE_SECURE=true
 STRAZ_ENV=production

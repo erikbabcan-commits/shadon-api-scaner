@@ -126,6 +126,20 @@ app.add_middleware(
 )
 
 
+def apply_security_headers(response: Response, request: Request) -> Response:
+    """Apply headers to normal responses and middleware-generated failures."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if "Content-Security-Policy" not in response.headers:
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    response.headers["Cache-Control"] = "no-store"
+    # Production TLS terminates at the platform edge. HSTS is ignored on HTTP.
+    if settings.is_production or request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 # 2. Request ID, Security Headers & Structured Request Logging Middleware
 @app.middleware("http")
 async def security_and_tracing_middleware(request: Request, call_next):
@@ -152,10 +166,10 @@ async def security_and_tracing_middleware(request: Request, call_next):
                 origin is None and request.headers.get("x-requested-with") == "XMLHttpRequest"
             ):
                 logger.warning("Rejected mutating request with untrusted origin")
-                return JSONResponse(
+                return apply_security_headers(JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
                     content={"detail": "Forbidden: untrusted origin"},
-                )
+                ), request)
 
     try:
         response: Response = await call_next(request)
@@ -168,25 +182,20 @@ async def security_and_tracing_middleware(request: Request, call_next):
             duration_ms,
             request_id,
         )
-        return JSONResponse(
+        return apply_security_headers(JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "detail": "Vyskytla sa interná chyba servera.",
                 "request_id": request_id,
             },
             headers={"X-Request-ID": request_id},
-        )
+        ), request)
 
     duration_ms = round((time.monotonic() - start_time) * 1000, 2)
 
     # Attach response headers
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    if "Content-Security-Policy" not in response.headers:
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
-    response.headers["Cache-Control"] = "no-store"
+    apply_security_headers(response, request)
 
     # Log request in structured format
     if not request.url.path.startswith("/api/health"):
