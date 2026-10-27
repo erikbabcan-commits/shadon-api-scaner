@@ -1,3 +1,5 @@
+> Historický implementačný report; nie dôkaz aktuálneho nasadenia alebo dostupnosti profilov. Aktuálny rozsah a stav: [NOTION_NOTES.md](../NOTION_NOTES.md).
+
 # EPIC 3 — Executive Reporting, Compliance Indicators and White Label Report
 
 ## Overview

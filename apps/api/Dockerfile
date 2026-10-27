@@ -54,4 +54,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD sh -c 'curl -fsS http://localhost:${PORT:-8000}/healthz/liveness || exit 1'
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips \"${STRAZ_TRUSTED_PROXY_IPS:-}\" --no-server-header"]

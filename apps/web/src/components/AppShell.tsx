@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useOnline } from "@/lib/useOnline";
 import { api } from "@/lib/api";
 import { ToastContainer } from "./Toast";
+import { ScannerAvailabilityNotice } from "./ScannerAvailabilityNotice";
 import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 interface TabItem {
@@ -183,6 +184,7 @@ export function AppShell({
       </header>
 
       <main className="app-main flex-1 w-full max-w-5xl mx-auto px-4 py-6">
+        <ScannerAvailabilityNotice />
         {children}
       </main>
 

@@ -1,0 +1,3 @@
+# Default upstream rules, without repository-wide baseline exemptions.
+[extend]
+useDefault = true
