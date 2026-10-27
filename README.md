@@ -11,6 +11,80 @@
 > a [prevádzkové overenie](docs/OPERATIONS_ACCEPTANCE.md).
 
 
+## Záverečný checklist operátora pred produkčným uzavretím
+
+Tento zoznam eviduje zostávajúce kroky; nezaškrtnutá položka nie je vykonaná
+ani overená. Samotné zlúčenie PR, zelené CI alebo úprava dokumentácie
+nepotvrdzujú produkčné nasadenie ani rotáciu tajomstiev.
+
+### 1. Prístupy a schválenie
+
+- [ ] Obnoviť dostupný spôsob správy Railway: dashboard alebo autentifikované CLI.
+  Chyba `402 Agent usage limit reached` sa týka limitu AI agenta; sama
+  nepotvrdzuje výpadok aplikácie. Zvýšenie limitu agenta je voliteľné a môže byť spoplatnené.
+- [ ] Overiť správny Railway projekt **dev-new**, environment **production**
+  a služby **straz-api**, **straz-worker**, **Postgres**, **Redis**.
+  Frontend patrí Vercel projektu **straz-monitoring**.
+- [ ] Výslovne schváliť zlúčenie [PR #4](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/4).
+  Pred merge znovu skontrolovať aktuálny HEAD, diff a CI.
+- [ ] Samostatne schváliť produkčnú rotáciu a nasadenie. Hodnoty tajomstiev
+  nevkladať do chatu, príkazových argumentov, logov ani Gitu.
+
+### 2. Priorita: uniknuté tajomstvá
+
+- [ ] Pripraviť obnoviteľnú zálohu a koordinovaný servisný postup podľa
+  [incidentného runbooku](docs/INCIDENT_ROTATION_RUNBOOK.md).
+  Dĺžka prípadného výpadku sa negarantuje.
+- [ ] Zrotovať skutočné heslo PostgreSQL roly a autentifikáciu Redisu,
+  zosúladiť privátne pripojenia API aj workera a overiť odmietnutie starých údajov.
+  Samotná zmena Railway premennej nemusí zmeniť heslo bežiacej databázy.
+- [ ] Zmeniť heslo existujúceho administrátora v databáze bezpečným aplikačným
+  postupom a zvýšiť `token_version`. Zmena `STRAZ_ADMIN_PASSWORD` sama
+  nemusí aktualizovať existujúci účet.
+- [ ] Vymeniť `STRAZ_SESSION_SECRET` vo všetkých relevantných inštanciách,
+  overiť nové prihlásenie a odmietnutie starej relácie bez vypísania cookies.
+- [ ] Zaznamenať výsledky rotácie bez hodnôt tajomstiev. História Gitu ich
+  obsahuje aj po odstránení z aktuálneho stromu; voliteľný prepis histórie
+  potrebuje osobitné schválenie a nenahrádza rotáciu.
+
+### 3. Proxy a nasadenie
+
+- [ ] Doložiť dôveryhodnú cestu klientovej IP pre Vercel → Railway → Uvicorn
+  aj priamy Railway vstup. Nenastavovať `STRAZ_TRUSTED_PROXY_IPS` naslepo
+  na `*` ani na celé privátne rozsahy. Overiť ochranu pred podvrhnutým
+  `X-Forwarded-For` a oddelené rozpočty limiteru pre dvoch klientov.
+- [ ] Overiť aktuálne commit piny služieb v Railway; pri pripnutom commite
+  push do `main` sám osebe nové API ani worker nenasadí.
+- [ ] Po schválení nasadiť konkrétny overený commit na API aj worker,
+  skontrolovať pre-deploy migrácie a zaznamenať skutočne bežiace SHA.
+- [ ] Frontend CSP ponechať v režime Report-Only, overiť prehliadač a až potom
+  schváliť vynucovanie. Otestovať aj Safari/iPhone prihlásenie cez Vercel proxy.
+- [ ] Osem CLI profilov ponechať zablokovaných do doplnenia a overenia
+  sieťovej izolácie; dostupné ostávajú Heartbeat a InternetDB.
+
+### 4. Akceptačné dôkazy a prevádzka
+
+- [ ] Overiť liveness/readiness HTTP 200 s PostgreSQL aj Redis, HSTS,
+  povolený/cudzí CORS origin, HTTP 401 bez relácie a bežiaci worker.
+  Test blokovaného CLI profilu (očakávané 409) vykonať iba s povolením na POST.
+- [ ] Read-only overiť Alembic head a PostgreSQL verziu; spočítať aplikácie
+  bez organizácie pomocou [pripraveného SQL](deploy/audit-readonly.sql).
+  Vlastníctvo ani dáta automaticky nemeniť.
+- [ ] Doložiť zálohovací plán, retenciu a úspešnú izolovanú obnovu;
+  nastaviť a otestovať alerty na neúspešné nasadenie a readiness.
+- [ ] Rozhodnúť o verejnej registrácii. Odstránenie syntetického testovacieho
+  účtu, backfill organizácií a iné dátové zásahy schváliť osobitne.
+- [ ] Overiť označenie DEMO dát a neprítomnosť aktívnych skenov demo cieľov.
+  Syntetické nálezy neprezentovať ako skutočné incidenty.
+- [ ] Na každom vývojárskom klone aktivovať hook z koreňa repozitára:
+  `git config --local core.hooksPath .githooks`; podľa
+  [návodu](docs/SECRET_SCAN.md) zabezpečiť Gitleaks a overiť hook.
+  Hook možno obísť, preto ponechať aj blokujúci CI secret gate.
+- [ ] Do release záznamu uložiť SHA, výsledky CI a živých kontrol,
+  zostávajúce riziká a schválenia. Tajomstvá ani osobné dáta nezapisovať.
+
+Podrobný prevádzkový postup: [OPERATIONS_ACCEPTANCE.md](docs/OPERATIONS_ACCEPTANCE.md).
+
 [![CI Pipeline](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml/badge.svg)](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB.svg)](https://react.dev)
