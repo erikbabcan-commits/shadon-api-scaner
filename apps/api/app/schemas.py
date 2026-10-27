@@ -188,6 +188,7 @@ class TargetOut(BaseModel):
 
 class AppOut(BaseModel):
     id: uuid.UUID
+    organization_id: uuid.UUID
     name: str
     environment: str
     base_url: str

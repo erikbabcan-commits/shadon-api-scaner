@@ -9,11 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import OrgContext, require_org_role
-from app.models import App, Finding, OrgRole
+from app.models import App, Finding, OrganizationMember, OrgRole
 from app.services.audit import write_audit
 from app.services.compliance import (
     calculate_security_score,
@@ -53,7 +54,18 @@ async def get_app_compliance(
         )
     )
     if not app:
-        raise HTTPException(status_code=404, detail="App not found")
+        fallback_app = await db.scalar(select(App).where(App.id == app_id))
+        if fallback_app:
+            membership = await db.scalar(
+                select(OrganizationMember).where(
+                    OrganizationMember.user_id == org_ctx.user.id,
+                    OrganizationMember.org_id == fallback_app.organization_id,
+                )
+            )
+            if membership:
+                app = fallback_app
+        if not app:
+            raise HTTPException(status_code=404, detail="App not found")
 
     findings = list(
         await db.scalars(select(Finding).where(Finding.app_id == app.id))
@@ -87,14 +99,30 @@ async def get_app_html_report(
             App.organization_id == org_ctx.org_id,
         )
     )
+    effective_org = org_ctx.organization
     if not app:
-        raise HTTPException(status_code=404, detail="App not found")
+        fallback_app = await db.scalar(select(App).where(App.id == app_id))
+        if fallback_app:
+            stmt = (
+                select(OrganizationMember)
+                .options(selectinload(OrganizationMember.organization))
+                .where(
+                    OrganizationMember.user_id == org_ctx.user.id,
+                    OrganizationMember.org_id == fallback_app.organization_id,
+                )
+            )
+            membership = await db.scalar(stmt)
+            if membership:
+                app = fallback_app
+                effective_org = membership.organization
+        if not app:
+            raise HTTPException(status_code=404, detail="App not found")
 
     findings = list(
         await db.scalars(select(Finding).where(Finding.app_id == app.id))
     )
 
-    html_text = generate_html_report(app, org_ctx.organization, findings)
+    html_text = generate_html_report(app, effective_org, findings)
     script_hash = base64.b64encode(hashlib.sha256(PRINT_SCRIPT.encode()).digest()).decode()
     return HTMLResponse(content=html_text, status_code=200, headers={
         "Content-Security-Policy": f"default-src 'none'; script-src 'sha256-{script_hash}'; style-src 'unsafe-inline'; img-src https:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",

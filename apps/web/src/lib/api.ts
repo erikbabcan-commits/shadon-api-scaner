@@ -93,6 +93,7 @@ export type ScanProfile =
 
 export type AppItem = {
   id: string;
+  organization_id?: string;
   name: string;
   environment: string;
   base_url: string;

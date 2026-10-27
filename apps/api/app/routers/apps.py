@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.deps import OrgContext, require_org_role
-from app.models import App, OrgRole, Target, TargetStatus
+from app.models import App, OrganizationMember, OrgRole, Target, TargetStatus
 from app.schemas import AppCreate, AppOut, AppUpdate, TargetCreate, TargetOut, TrustPrivateRequest
 from app.services.audit import write_audit
 from app.services.quota import check_app_limit
@@ -111,6 +111,19 @@ async def get_app(
         .options(selectinload(App.targets))
     )
     if not app:
+        # Cross-organization access check: allow if the authenticated user is a verified member of the app's organization
+        fallback_app = await db.scalar(
+            select(App).where(App.id == app_id).options(selectinload(App.targets))
+        )
+        if fallback_app:
+            membership = await db.scalar(
+                select(OrganizationMember).where(
+                    OrganizationMember.user_id == org_ctx.user.id,
+                    OrganizationMember.org_id == fallback_app.organization_id,
+                )
+            )
+            if membership:
+                return fallback_app
         raise HTTPException(status_code=404, detail="App not found")
     return app
 

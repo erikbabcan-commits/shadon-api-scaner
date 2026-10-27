@@ -13,6 +13,18 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 5_000,
       refetchOnWindowFocus: true,
+      retry: (failureCount, error: any) => {
+        const msg = String(error?.message || "");
+        if (
+          msg.includes("404") ||
+          msg.includes("Not found") ||
+          msg.includes("401") ||
+          msg.includes("403")
+        ) {
+          return false;
+        }
+        return failureCount < 2;
+      },
     },
   },
 });

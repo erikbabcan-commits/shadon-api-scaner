@@ -4,7 +4,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { SkeletonCard, SkeletonTable } from "@/components/Skeleton";
-import { api, type AppItem, type ScanProfile, type Target } from "@/lib/api";
+import { api, getActiveOrgId, setActiveOrgId, type AppItem, type ScanProfile, type Target } from "@/lib/api";
 import { formatLatency, formatTimeAgo } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { useOnline } from "@/lib/useOnline";
@@ -413,7 +413,17 @@ export function AppDetailPage() {
     queryKey: ["app", appId],
     queryFn: () => api.app(appId),
     enabled: Boolean(appId),
+    retry: false,
   });
+
+  useEffect(() => {
+    if (appQuery.data?.organization_id) {
+      const current = getActiveOrgId();
+      if (current !== appQuery.data.organization_id) {
+        setActiveOrgId(appQuery.data.organization_id);
+      }
+    }
+  }, [appQuery.data?.organization_id]);
 
   const invalidate = async () => {
     await qc.invalidateQueries({ queryKey: ["app", appId] });
@@ -457,8 +467,30 @@ export function AppDetailPage() {
         )}
 
         {appQuery.isError && (
-          <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm">
-            Nepodarilo sa načítať aplikáciu. Skontrolujte svoje internetové pripojenie alebo platnosť ID.
+          <div className="p-8 rounded-2xl bg-white border border-slate-200 text-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <svg className="w-6 h-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-base font-bold text-slate-900">Aplikácia nebola nájdená</h3>
+            </div>
+            <p className="text-xs text-slate-500 max-w-lg leading-relaxed">
+              Požadovaná aplikácia (ID: <code className="font-mono text-slate-700 bg-slate-100 px-1 py-0.5 rounded">{appId}</code>) neexistuje, bola odstránená alebo k nej nemáte prístup v aktuálne zvolenom pracovnom priestore.
+            </p>
+            <div className="flex items-center gap-3 pt-2">
+              <Link
+                to="/apps"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition shadow-sm"
+              >
+                Späť na zoznam aplikácií
+              </Link>
+              <Link
+                to="/"
+                className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+              >
+                Prejsť na Prehľad
+              </Link>
+            </div>
           </div>
         )}
 

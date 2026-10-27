@@ -10,15 +10,33 @@ export function OrganizationSwitcher() {
 
   useEffect(() => {
     loadOrgs();
+
+    const handleOrgChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ orgId: string | null }>;
+      if (customEvent.detail?.orgId) {
+        setActiveId(customEvent.detail.orgId);
+      }
+    };
+
+    window.addEventListener("straz:org-changed", handleOrgChanged);
+    return () => {
+      window.removeEventListener("straz:org-changed", handleOrgChanged);
+    };
   }, []);
 
   async function loadOrgs() {
     try {
       const list = await api.getOrgs();
       setOrgs(list);
-      if (list.length > 0 && !activeId) {
-        setActiveId(list[0].id);
-        setActiveOrgId(list[0].id);
+      if (list.length > 0) {
+        const currentActive = getActiveOrgId();
+        const exists = list.some((o) => o.id === currentActive);
+        if (!exists) {
+          setActiveId(list[0].id);
+          setActiveOrgId(list[0].id);
+        } else if (currentActive !== activeId) {
+          setActiveId(currentActive);
+        }
       }
     } catch {
       /* ignore */
