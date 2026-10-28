@@ -10,6 +10,8 @@ import { toast } from "@/lib/toast";
 import { useOnline } from "@/lib/useOnline";
 import { isScanProfileAvailable } from "@/lib/scanAvailability";
 import { CompliancePanel } from "@/components/CompliancePanel";
+import { CVSSBadge } from "@/components/CVSSBadge";
+import { PoCViewer } from "@/components/PoCViewer";
 
 const SCAN_BUTTONS: Array<[ScanProfile, string, boolean]> = [
   ["heartbeat", "Heartbeat", false],
@@ -378,7 +380,146 @@ function AppTargetsSection({ appId, targets, online, onInvalidate }: AppTargetsP
   );
 }
 
-// --- 5. Danger Zone Component ---
+// --- 5. Findings & CVSS Section ---
+interface AppFindingsSectionProps {
+  appId: string;
+  online: boolean;
+  onInvalidate: () => Promise<void>;
+}
+
+function AppFindingsSection({ appId, online, onInvalidate }: AppFindingsSectionProps) {
+  const qc = useQueryClient();
+  const findingsQuery = useQuery({
+    queryKey: ["findings", "app", appId],
+    queryFn: () => api.findings({ app_id: appId }),
+    enabled: Boolean(appId),
+  });
+
+  const update = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "open" | "accepted" | "fixed" }) =>
+      api.updateFinding(id, status),
+    onSuccess: async (_, variables) => {
+      toast.success(
+        variables.status === "accepted"
+          ? "Nález bol označený ako akceptované riziko"
+          : "Nález bol označený ako opravený"
+      );
+      await qc.invalidateQueries({ queryKey: ["findings"] });
+      await onInvalidate();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Nepodarilo sa aktualizovať nález");
+    },
+  });
+
+  const sevBadge = {
+    critical: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+    high: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+    medium: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+    low: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+    info: "bg-slate-800 text-slate-300 border-slate-700",
+  };
+
+  const findings = findingsQuery.data ?? [];
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
+            <span>Bezpečnostné nálezy & CVSS v3.1</span>
+            {findings.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                {findings.length}
+              </span>
+            )}
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Zraniteľnosti s CVSS v3.1 metrikou a overením reprodukcie (PoC)
+          </p>
+        </div>
+
+        <Link
+          to="/findings"
+          className="text-xs text-sky-400 hover:text-sky-300 font-medium transition"
+        >
+          Zobraziť všetky nálezy →
+        </Link>
+      </div>
+
+      {findingsQuery.isLoading ? (
+        <SkeletonTable rows={2} />
+      ) : findings.length === 0 ? (
+        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 text-center">
+          Neboli detegované žiadne otvorené bezpečnostné nálezy pre túto aplikáciu.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {findings.map((f) => (
+            <div
+              key={f.id}
+              className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 space-y-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`text-xs uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${
+                      sevBadge[f.severity]
+                    }`}
+                  >
+                    {f.severity}
+                  </span>
+                  <CVSSBadge score={f.cvss_score} vector={f.cvss_vector} size="sm" />
+                  <span className="text-xs text-slate-400 font-mono">zdroj: {f.source}</span>
+                </div>
+
+                <span className="text-[11px] text-slate-500 shrink-0">
+                  {formatTimeAgo(f.last_seen_at)}
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-100">{f.title}</h3>
+                {f.detail && (
+                  <pre className="mt-1.5 p-2.5 rounded-lg bg-slate-900 border border-slate-800/80 text-xs text-slate-300 font-mono whitespace-pre-wrap break-all max-h-36 overflow-y-auto">
+                    {f.detail}
+                  </pre>
+                )}
+              </div>
+
+              <PoCViewer
+                findingId={f.id}
+                pocCommand={f.poc_command}
+                remediationPatch={f.remediation_patch}
+              />
+
+              {f.status === "open" && (
+                <div className="flex gap-2 pt-2 border-t border-slate-800/60 justify-end">
+                  <button
+                    disabled={!online || update.isPending}
+                    onClick={() => update.mutate({ id: f.id, status: "accepted" })}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 transition disabled:opacity-50"
+                  >
+                    Akceptovať riziko
+                  </button>
+                  <button
+                    disabled={!online || update.isPending}
+                    onClick={() => update.mutate({ id: f.id, status: "fixed" })}
+                    className="px-3 py-1 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition disabled:opacity-50"
+                  >
+                    Označiť ako opravené
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- 6. Danger Zone Component ---
 interface AppDangerZoneProps {
   onOpenDelete: () => void;
 }
@@ -520,6 +661,12 @@ export function AppDetailPage() {
             <AppTargetsSection
               appId={appId}
               targets={app.targets}
+              online={online}
+              onInvalidate={invalidate}
+            />
+
+            <AppFindingsSection
+              appId={appId}
               online={online}
               onInvalidate={invalidate}
             />

@@ -26,6 +26,10 @@ async def upsert_finding(
     title: str,
     detail: str | None,
     fingerprint: str,
+    cvss_score: float | None = None,
+    cvss_vector: str | None = None,
+    poc_command: str | None = None,
+    remediation_patch: str | None = None,
     notify: bool = False,
 ) -> Finding:
     existing = await db.scalar(
@@ -37,6 +41,14 @@ async def upsert_finding(
         existing.severity = severity
         existing.title = title
         existing.detail = detail
+        if cvss_score is not None:
+            existing.cvss_score = cvss_score
+        if cvss_vector is not None:
+            existing.cvss_vector = cvss_vector
+        if poc_command is not None:
+            existing.poc_command = poc_command
+        if remediation_patch is not None:
+            existing.remediation_patch = remediation_patch
         await _record_observation(db, existing, False)
         if existing.status == FindingStatus.fixed:
             existing.status = FindingStatus.open
@@ -54,6 +66,10 @@ async def upsert_finding(
         detail=detail,
         fingerprint=fingerprint,
         status=FindingStatus.open,
+        cvss_score=cvss_score,
+        cvss_vector=cvss_vector,
+        poc_command=poc_command,
+        remediation_patch=remediation_patch,
         first_seen_at=now,
         last_seen_at=now,
     )

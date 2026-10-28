@@ -386,6 +386,12 @@ class Finding(Base):
     status: Mapped[FindingStatus] = mapped_column(
         Enum(FindingStatus, native_enum=False), default=FindingStatus.open
     )
+    # CVSS v3.1 & PoC Verification (integrated from STRIX)
+    cvss_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cvss_vector: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    poc_command: Mapped[str | None] = mapped_column(Text, nullable=True)
+    remediation_patch: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

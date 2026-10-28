@@ -138,6 +138,10 @@ export type Finding = {
   detail: string | null;
   fingerprint: string;
   status: "open" | "accepted" | "fixed";
+  cvss_score?: number | null;
+  cvss_vector?: string | null;
+  poc_command?: string | null;
+  remediation_patch?: string | null;
   first_seen_at: string;
   last_seen_at: string;
   closed_at: string | null;
@@ -406,10 +410,41 @@ export const api = {
     const qs = q.toString();
     return request<Finding[]>(`/api/findings${qs ? `?${qs}` : ""}`);
   },
-  updateFinding: (id: string, status: Finding["status"]) =>
-    request<Finding>(`/api/findings/${id}`, {
+  updateFinding: (
+    id: string,
+    data: {
+      status?: Finding["status"];
+      cvss_score?: number | null;
+      cvss_vector?: string | null;
+      poc_command?: string | null;
+      remediation_patch?: string | null;
+    } | Finding["status"]
+  ) => {
+    const body = typeof data === "string" ? { status: data } : data;
+    return request<Finding>(`/api/findings/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(body),
+    });
+  },
+  calculateCvss: (params: { vector?: string; breakdown?: Record<string, string> }) =>
+    request<{
+      score: number;
+      severity: string;
+      vector: string;
+      breakdown: Record<string, string>;
+    }>("/api/findings/cvss/calculate", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  verifyPoc: (findingId: string, curlCommand?: string) =>
+    request<{
+      verified: boolean;
+      status_code: number | null;
+      execution_time_ms: number;
+      output: string;
+    }>(`/api/findings/${findingId}/verify-poc`, {
+      method: "POST",
+      body: JSON.stringify({ curl_command: curlCommand || "" }),
     }),
   reportClientError: (error: unknown, info?: unknown) =>
     request<void>("/api/client-errors", {

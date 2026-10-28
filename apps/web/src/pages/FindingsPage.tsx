@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { CVSSBadge } from "@/components/CVSSBadge";
 import { EmptyState } from "@/components/EmptyState";
+import { PoCViewer } from "@/components/PoCViewer";
 import { SkeletonTable } from "@/components/Skeleton";
 import { api, type Finding } from "@/lib/api";
 import { formatTimeAgo } from "@/lib/format";
@@ -26,14 +28,30 @@ export function FindingsPage() {
   });
 
   const update = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: Finding["status"] }) =>
-      api.updateFinding(id, status),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data:
+        | Finding["status"]
+        | {
+            status?: Finding["status"];
+            cvss_score?: number | null;
+            cvss_vector?: string | null;
+            poc_command?: string | null;
+            remediation_patch?: string | null;
+          };
+    }) => api.updateFinding(id, data),
     onSuccess: (_, variables) => {
-      toast.success(
-        variables.status === "accepted"
-          ? "Nález bol označený ako akceptované riziko"
-          : "Nález bol označený ako opravený",
-      );
+      const status = typeof variables.data === "string" ? variables.data : variables.data.status;
+      if (status === "accepted") {
+        toast.success("Nález bol označený ako akceptované riziko");
+      } else if (status === "fixed") {
+        toast.success("Nález bol označený ako opravený");
+      } else if (typeof variables.data !== "string" && variables.data.cvss_score !== undefined) {
+        toast.success("CVSS metrika a skóre boli aktualizované");
+      }
       qc.invalidateQueries({ queryKey: ["findings"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
     },
@@ -96,12 +114,22 @@ export function FindingsPage() {
                 className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 sm:p-5 space-y-3 transition hover:border-slate-700/80"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className={`text-xs uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border ${sevBadge[f.severity]}`}
                     >
                       {f.severity}
                     </span>
+                    <CVSSBadge
+                      score={f.cvss_score}
+                      vector={f.cvss_vector}
+                      onVectorChange={(newVec, newScore) => {
+                        update.mutate({
+                          id: f.id,
+                          data: { cvss_vector: newVec, cvss_score: newScore },
+                        } as any);
+                      }}
+                    />
                     <span className="text-xs text-slate-400 font-mono">
                       zdroj: {f.source}
                     </span>
@@ -121,18 +149,24 @@ export function FindingsPage() {
                   )}
                 </div>
 
+                <PoCViewer
+                  findingId={f.id}
+                  pocCommand={f.poc_command}
+                  remediationPatch={f.remediation_patch}
+                />
+
                 {f.status === "open" && (
                   <div className="flex gap-2 pt-1 border-t border-slate-800/60 justify-end">
                     <button
                       disabled={update.isPending}
-                      onClick={() => update.mutate({ id: f.id, status: "accepted" })}
+                      onClick={() => update.mutate({ id: f.id, data: "accepted" })}
                       className="px-3 py-1.5 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 transition disabled:opacity-50"
                     >
                       Akceptovať riziko
                     </button>
                     <button
                       disabled={update.isPending}
-                      onClick={() => update.mutate({ id: f.id, status: "fixed" })}
+                      onClick={() => update.mutate({ id: f.id, data: "fixed" })}
                       className="px-3.5 py-1.5 text-xs font-medium rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition disabled:opacity-50"
                     >
                       Označiť ako opravené

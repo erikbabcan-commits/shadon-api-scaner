@@ -245,6 +245,10 @@ class FindingOut(BaseModel):
     detail: str | None
     fingerprint: str
     status: FindingStatus
+    cvss_score: float | None = None
+    cvss_vector: str | None = None
+    poc_command: str | None = None
+    remediation_patch: str | None = None
     first_seen_at: datetime
     last_seen_at: datetime
     closed_at: datetime | None
@@ -252,8 +256,51 @@ class FindingOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FindingCreate(BaseModel):
+    app_id: uuid.UUID
+    target_id: uuid.UUID | None = None
+    source: FindingSource
+    severity: FindingSeverity
+    title: str
+    detail: str | None = None
+    fingerprint: str
+    status: FindingStatus = FindingStatus.open
+    cvss_score: float | None = None
+    cvss_vector: str | None = None
+    poc_command: str | None = None
+    remediation_patch: str | None = None
+
+
 class FindingUpdate(BaseModel):
-    status: FindingStatus
+    status: FindingStatus | None = None
+    cvss_score: float | None = None
+    cvss_vector: str | None = None
+    poc_command: str | None = None
+    remediation_patch: str | None = None
+
+
+class CVSSCalculationRequest(BaseModel):
+    vector: str | None = None
+    breakdown: dict[str, str] | None = None
+
+
+class CVSSCalculationResponse(BaseModel):
+    score: float
+    severity: str
+    vector: str
+    breakdown: dict[str, str]
+
+
+class PoCVerifyRequest(BaseModel):
+    curl_command: str
+    target_url: str | None = None
+
+
+class PoCVerifyResponse(BaseModel):
+    verified: bool
+    status_code: int | None = None
+    execution_time_ms: float
+    output: str
 
 
 class OverviewApp(BaseModel):

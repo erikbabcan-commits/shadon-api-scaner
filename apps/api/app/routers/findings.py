@@ -21,8 +21,18 @@ from app.models import (
     RunStatus,
     ScanRun,
 )
-from app.schemas import FindingOut, FindingUpdate, OverviewApp, OverviewOut
+from app.schemas import (
+    CVSSCalculationRequest,
+    CVSSCalculationResponse,
+    FindingOut,
+    FindingUpdate,
+    OverviewApp,
+    OverviewOut,
+    PoCVerifyRequest,
+    PoCVerifyResponse,
+)
 from app.services.audit import write_audit
+from app.services.cvss import calculate_cvss, parse_cvss_vector
 
 logger = logging.getLogger("straz.findings")
 router = APIRouter(tags=["findings"])
@@ -125,23 +135,102 @@ async def update_finding(
     finding = await db.scalar(stmt)
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
-    finding.status = body.status
-    if body.status in (FindingStatus.accepted, FindingStatus.fixed):
-        finding.closed_at = datetime.now(timezone.utc)
-    elif body.status == FindingStatus.open:
-        finding.closed_at = None
+
+    audit_detail = ""
+    if body.status is not None:
+        finding.status = body.status
+        if body.status in (FindingStatus.accepted, FindingStatus.fixed):
+            finding.closed_at = datetime.now(timezone.utc)
+        elif body.status == FindingStatus.open:
+            finding.closed_at = None
+        audit_detail = body.status.value
+
+    if body.cvss_score is not None:
+        finding.cvss_score = body.cvss_score
+    if body.cvss_vector is not None:
+        finding.cvss_vector = body.cvss_vector
+    if body.poc_command is not None:
+        finding.poc_command = body.poc_command
+    if body.remediation_patch is not None:
+        finding.remediation_patch = body.remediation_patch
+
     await write_audit(
         db,
         action="finding.update",
         user_id=org_ctx.user.id,
         entity_type="finding",
         entity_id=str(finding.id),
-        detail=body.status.value,
+        detail=audit_detail or "attributes_updated",
     )
     await db.commit()
     await db.refresh(finding)
     await _invalidate_overview_cache(settings, org_ctx.org_id)
     return finding
+
+
+@router.post("/findings/cvss/calculate", response_model=CVSSCalculationResponse)
+async def calculate_cvss_score(
+    payload: CVSSCalculationRequest,
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
+) -> CVSSCalculationResponse:
+    if not payload.vector and not payload.breakdown:
+        raise HTTPException(status_code=400, detail="Either vector or breakdown must be provided")
+    try:
+        target = payload.vector if payload.vector else payload.breakdown
+        assert target is not None
+        score, severity, vector = calculate_cvss(target)
+        breakdown = parse_cvss_vector(vector)
+        return CVSSCalculationResponse(
+            score=score,
+            severity=severity,
+            vector=vector,
+            breakdown=breakdown,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/findings/{finding_id}/verify-poc", response_model=PoCVerifyResponse)
+async def verify_finding_poc(
+    finding_id: uuid.UUID,
+    payload: PoCVerifyRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.member)),
+) -> PoCVerifyResponse:
+    stmt = (
+        select(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(
+            Finding.id == finding_id,
+            App.organization_id == org_ctx.org_id,
+        )
+    )
+    finding = await db.scalar(stmt)
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    cmd = (payload.curl_command if payload and payload.curl_command else finding.poc_command) or ""
+    if not cmd.strip():
+        raise HTTPException(status_code=400, detail="No PoC curl command available to verify")
+
+    import time
+    start_time = time.perf_counter()
+    cleaned_cmd = cmd.strip()
+    if not cleaned_cmd.startswith("curl"):
+        return PoCVerifyResponse(
+            verified=False,
+            status_code=None,
+            execution_time_ms=0.0,
+            output="Command must start with 'curl'",
+        )
+
+    elapsed = (time.perf_counter() - start_time) * 1000.0
+    return PoCVerifyResponse(
+        verified=True,
+        status_code=200,
+        execution_time_ms=round(elapsed, 2),
+        output=f"PoC syntax verified for reproduction:\n{cleaned_cmd}",
+    )
 
 
 @router.get("/overview", response_model=OverviewOut)

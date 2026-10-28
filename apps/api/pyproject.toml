@@ -19,6 +19,7 @@ dependencies = [
   "python-multipart>=0.0.17",
   "dnspython>=2.7.0",
   "email-validator>=2.2.0",
+  "cvss>=3.6",
 ]
 
 [project.optional-dependencies]
