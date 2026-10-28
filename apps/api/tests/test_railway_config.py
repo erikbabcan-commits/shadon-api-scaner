@@ -32,6 +32,31 @@ def test_dockerfile_uses_dynamic_port_with_fallback():
     assert dockerfile_path.exists(), "Dockerfile must exist in apps/api"
 
     content = dockerfile_path.read_text(encoding="utf-8")
-    assert 'CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]' in content, (
-        "Dockerfile CMD must use sh -c with ${PORT:-8000}"
-    )
+    command = json.loads(next(line[4:] for line in content.splitlines() if line.startswith("CMD ")))
+    assert command[:2] == ["sh", "-c"]
+    assert "${PORT:-8000}" in command[2]
+    assert '--forwarded-allow-ips "${STRAZ_TRUSTED_PROXY_IPS:-}"' in command[2]
+    assert "--proxy-headers" in command[2]
+    assert "--no-server-header" in command[2]
+
+
+def test_start_commands_preserve_proxy_allowlist_argument(tmp_path):
+    import os
+    import shlex
+    import subprocess
+
+    api_dir = Path(__file__).resolve().parent.parent
+    binary = tmp_path / "uvicorn"
+    binary.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
+    binary.chmod(0o700)
+    config = json.loads((api_dir / "railway.api.json").read_text())
+    docker = json.loads(next(line[4:] for line in (api_dir / "Dockerfile").read_text().splitlines() if line.startswith("CMD ")))
+    for trust in ("", "192.0.2.10,192.0.2.11"):
+        env = {**os.environ, "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+               "PORT": "8123", "STRAZ_TRUSTED_PROXY_IPS": trust}
+        for command in (docker, shlex.split(config["deploy"]["startCommand"])):
+            result = subprocess.run(command, env=env, capture_output=True, text=True, check=True)
+            args = result.stdout.splitlines()
+            assert args[args.index("--port") + 1] == "8123"
+            assert args[args.index("--forwarded-allow-ips") + 1] == trust
+            assert "--proxy-headers" in args

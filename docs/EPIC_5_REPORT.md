@@ -1,3 +1,5 @@
+> Historický implementačný report; nie dôkaz aktuálneho nasadenia alebo dostupnosti profilov. Aktuálny rozsah a stav: [NOTION_NOTES.md](../NOTION_NOTES.md).
+
 # EPIC 5 — Scoped API Keys & DevSecOps CI/CD Gate Report
 
 ## Overview

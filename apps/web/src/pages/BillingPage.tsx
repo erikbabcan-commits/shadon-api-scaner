@@ -172,7 +172,7 @@ export function BillingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-sky-400">✓</span>
-                    {p.cron_schedule ? `Automatický sken: ${p.cron_schedule}` : "Iba manuálny sken"}
+                    Automatický Heartbeat podľa nastavenia prevádzky
                   </li>
                   <li className="flex items-center gap-2">
                     <span className={p.white_label ? "text-sky-400" : "text-slate-600"}>

@@ -9,7 +9,7 @@ export const CiCodeGenerator: React.FC<CiCodeGeneratorProps> = ({ apps }) => {
   const [activeTab, setActiveTab] = useState<"github" | "gitlab" | "curl">("github");
   const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id || "<APP_ID>");
   const [failOn, setFailOn] = useState<"critical" | "high" | "medium">("high");
-  const [profile, setProfile] = useState<string>("safe");
+  const [profile, setProfile] = useState<string>("heartbeat");
   const [copied, setCopied] = useState(false);
 
   const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://app.straz.sk";
@@ -187,12 +187,13 @@ straz-security-gate:
             onChange={(e) => setProfile(e.target.value)}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
           >
-            <option value="safe">Safe (Rýchly & Bezpečný sken)</option>
-            <option value="tls">TLS & SSL Kontrola certifikátov</option>
-            <option value="http">HTTP Bezpečnostné hlavičky</option>
+            <option value="safe" disabled>Safe (Rýchly & Bezpečný sken)</option>
+            <option value="tls" disabled>TLS & SSL Kontrola certifikátov</option>
+            <option value="http" disabled>HTTP Bezpečnostné hlavičky</option>
             <option value="heartbeat">Heartbeat / Liveness</option>
-            <option value="gitleaks">GitLeaks (Detekcia uniknutých kľúčov)</option>
-            <option value="trivy_fs">Trivy Filesystem (CVE závislosti)</option>
+            <option value="internetdb">InternetDB</option>
+            <option value="gitleaks" disabled>GitLeaks (Detekcia uniknutých kľúčov)</option>
+            <option value="trivy_fs" disabled>Trivy Filesystem (CVE závislosti)</option>
           </select>
         </div>
 
@@ -200,7 +201,10 @@ straz-security-gate:
           <label className="block text-xs font-medium text-slate-400 mb-1">Zlyhať pipeline pri (Threshold)</label>
           <select
             value={failOn}
-            onChange={(e) => setFailOn(e.target.value as any)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "critical" || value === "high" || value === "medium") setFailOn(value);
+            }}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
           >
             <option value="critical">Zlyhať iba pri CRITICAL</option>

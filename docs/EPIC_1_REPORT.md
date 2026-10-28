@@ -1,3 +1,5 @@
+> Historický implementačný report; nie dôkaz aktuálneho nasadenia alebo dostupnosti profilov. Aktuálny rozsah a stav: [NOTION_NOTES.md](../NOTION_NOTES.md).
+
 # EPIC 1 — Organizations, Multi-Tenancy and RBAC Report
 
 ## Overview

@@ -8,6 +8,7 @@ import { api, getActiveOrgId, setActiveOrgId, type AppItem, type ScanProfile, ty
 import { formatLatency, formatTimeAgo } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { useOnline } from "@/lib/useOnline";
+import { isScanProfileAvailable } from "@/lib/scanAvailability";
 import { CompliancePanel } from "@/components/CompliancePanel";
 
 const SCAN_BUTTONS: Array<[ScanProfile, string, boolean]> = [
@@ -132,17 +133,18 @@ function AppScansSection({ appId, hasVerified, online, onInvalidate }: AppScansS
 
       <div className="flex flex-wrap gap-2 pt-1">
         {SCAN_BUTTONS.map(([profile, label, needsVerified]) => {
-          const disabled = !online || runScan.isPending || (needsVerified && !hasVerified);
+          const unavailable = !isScanProfileAvailable(profile);
+          const disabled = unavailable || !online || runScan.isPending || (needsVerified && !hasVerified);
           return (
             <button
               key={profile}
               disabled={disabled}
               onClick={() => runScan.mutate(profile)}
-              title={needsVerified && !hasVerified ? "Najprv overte target" : undefined}
+              title={unavailable ? "Dočasne nedostupné do doplnenia izolácie skenerov" : needsVerified && !hasVerified ? "Najprv overte target" : undefined}
               className="px-3 py-1.5 rounded-xl text-xs font-medium border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-              {label}
+              {label}{unavailable ? " — nedostupné" : ""}
             </button>
           );
         })}
