@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import html
+import io
+import csv
 import json
 import re
 import uuid
@@ -290,3 +292,68 @@ def generate_html_report(
 </html>
 """
     return html_content
+
+
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_safe(value: object) -> str:
+    """Return ``value`` as a CSV cell that spreadsheets will not execute as a formula.
+
+    Ported from STRIX (strix/report/writer.py) to prevent CSV Formula Injection (CWE-1236).
+    """
+    if value is None:
+        return ""
+    text = str(value)
+    if text.startswith(_CSV_FORMULA_PREFIXES):
+        return f"'{text}"
+    return text
+
+
+def generate_csv_report(
+    findings: list[Finding],
+    app: App | None = None,
+) -> str:
+    """Generate a formula-safe CSV spreadsheet of findings."""
+    output = io.StringIO()
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+
+    # Header
+    writer.writerow([
+        "ID",
+        "Názov",
+        "Závažnosť",
+        "CVSS Skóre",
+        "CVSS Vektor",
+        "Zdroj",
+        "Status",
+        "Aplikácia",
+        "PoC Príkaz (curl)",
+        "Opravný Patch",
+        "Prvý výskyt",
+        "Posledný výskyt",
+        "Detail",
+    ])
+
+    app_name = app.name if app else ""
+
+    for f in findings:
+        cvss_score_str = f"{f.cvss_score:.1f}" if f.cvss_score is not None else ""
+        writer.writerow([
+            str(f.id),
+            csv_safe(f.title),
+            f.severity.value,
+            cvss_score_str,
+            csv_safe(f.cvss_vector or ""),
+            f.source.value if f.source else "",
+            f.status.value,
+            csv_safe(app_name),
+            csv_safe(f.poc_command or ""),
+            csv_safe(f.remediation_patch or ""),
+            f.first_seen_at.isoformat() if f.first_seen_at else "",
+            f.last_seen_at.isoformat() if f.last_seen_at else "",
+            csv_safe(f.detail or ""),
+        ])
+
+    return output.getvalue()
+

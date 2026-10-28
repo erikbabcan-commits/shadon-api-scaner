@@ -439,12 +439,42 @@ function AppFindingsSection({ appId, online, onInvalidate }: AppFindingsSectionP
           </p>
         </div>
 
-        <Link
-          to="/findings"
-          className="text-xs text-sky-400 hover:text-sky-300 font-medium transition"
-        >
-          Zobraziť všetky nálezy →
-        </Link>
+        <div className="flex items-center gap-2">
+          {findings.length > 0 && (
+            <>
+              <a
+                href={`/api/apps/${appId}/report/sarif`}
+                download
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-sky-300 transition"
+                title="Stiahnuť SARIF 2.1.0 report pre GitHub Code Scanning"
+              >
+                <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>SARIF</span>
+              </a>
+
+              <a
+                href={`/api/apps/${appId}/report/csv`}
+                download
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-emerald-300 transition"
+                title="Stiahnuť bezpečný CSV audit report"
+              >
+                <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>CSV</span>
+              </a>
+            </>
+          )}
+
+          <Link
+            to="/findings"
+            className="text-xs text-sky-400 hover:text-sky-300 font-medium transition ml-1"
+          >
+            Všetky nálezy →
+          </Link>
+        </div>
       </div>
 
       {findingsQuery.isLoading ? (

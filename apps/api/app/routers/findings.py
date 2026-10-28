@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -33,6 +34,8 @@ from app.schemas import (
 )
 from app.services.audit import write_audit
 from app.services.cvss import calculate_cvss, parse_cvss_vector
+from app.services.reporting import generate_csv_report
+from app.services.sarif import build_sarif_report
 
 logger = logging.getLogger("straz.findings")
 router = APIRouter(tags=["findings"])
@@ -94,6 +97,72 @@ async def list_findings(
     response.headers["X-Next-Offset"] = str(offset + len(items)) if has_more else ""
 
     return items
+
+
+@router.get("/findings/export/sarif")
+async def export_org_findings_sarif(
+    app_id: uuid.UUID | None = None,
+    status_filter: FindingStatus | None = None,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
+) -> Response:
+    org_filter = App.organization_id == org_ctx.org_id
+    stmt = (
+        select(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(org_filter)
+        .order_by(Finding.last_seen_at.desc())
+    )
+    if status_filter:
+        stmt = stmt.where(Finding.status == status_filter)
+    if app_id:
+        stmt = stmt.where(Finding.app_id == app_id)
+
+    findings = list(await db.scalars(stmt))
+    app_obj = await db.get(App, app_id) if app_id else None
+
+    sarif_doc = build_sarif_report(findings, app=app_obj)
+    return Response(
+        content=json.dumps(sarif_doc, indent=2),
+        media_type="application/sarif+json",
+        headers={
+            "Content-Disposition": 'attachment; filename="straz-findings.sarif"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/findings/export/csv")
+async def export_org_findings_csv(
+    app_id: uuid.UUID | None = None,
+    status_filter: FindingStatus | None = None,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
+) -> Response:
+    org_filter = App.organization_id == org_ctx.org_id
+    stmt = (
+        select(Finding)
+        .join(App, Finding.app_id == App.id)
+        .where(org_filter)
+        .order_by(Finding.last_seen_at.desc())
+    )
+    if status_filter:
+        stmt = stmt.where(Finding.status == status_filter)
+    if app_id:
+        stmt = stmt.where(Finding.app_id == app_id)
+
+    findings = list(await db.scalars(stmt))
+    app_obj = await db.get(App, app_id) if app_id else None
+
+    csv_data = generate_csv_report(findings, app=app_obj)
+    return Response(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="straz-findings.csv"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/findings/{finding_id}", response_model=FindingOut)

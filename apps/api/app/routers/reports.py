@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import uuid
 import base64
 import hashlib
+import json
+import re
+import uuid
 from typing import Any
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -22,7 +23,8 @@ from app.services.compliance import (
     map_owasp_top_10,
 )
 from app.services.quota import get_plan_tier
-from app.services.reporting import generate_html_report, PRINT_SCRIPT
+from app.services.reporting import generate_html_report, generate_csv_report, PRINT_SCRIPT
+from app.services.sarif import build_sarif_report
 
 router = APIRouter(tags=["reports"])
 
@@ -128,6 +130,90 @@ async def get_app_html_report(
         "Content-Security-Policy": f"default-src 'none'; script-src 'sha256-{script_hash}'; style-src 'unsafe-inline'; img-src https:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
         "Cache-Control": "no-store",
     })
+
+
+@router.get("/apps/{app_id}/report/sarif")
+async def get_app_sarif_report(
+    app_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
+) -> Response:
+    app = await db.scalar(
+        select(App).where(
+            App.id == app_id,
+            App.organization_id == org_ctx.org_id,
+        )
+    )
+    if not app:
+        fallback_app = await db.scalar(select(App).where(App.id == app_id))
+        if fallback_app:
+            membership = await db.scalar(
+                select(OrganizationMember).where(
+                    OrganizationMember.user_id == org_ctx.user.id,
+                    OrganizationMember.org_id == fallback_app.organization_id,
+                )
+            )
+            if membership:
+                app = fallback_app
+        if not app:
+            raise HTTPException(status_code=404, detail="App not found")
+
+    findings = list(
+        await db.scalars(select(Finding).where(Finding.app_id == app.id))
+    )
+
+    sarif_doc = build_sarif_report(findings, app=app)
+    slug = re.sub(r"[^a-zA-Z0-9_-]", "-", app.name.lower())
+    return Response(
+        content=json.dumps(sarif_doc, indent=2),
+        media_type="application/sarif+json",
+        headers={
+            "Content-Disposition": f'attachment; filename="straz-{slug}-findings.sarif"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/apps/{app_id}/report/csv")
+async def get_app_csv_report(
+    app_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.viewer)),
+) -> Response:
+    app = await db.scalar(
+        select(App).where(
+            App.id == app_id,
+            App.organization_id == org_ctx.org_id,
+        )
+    )
+    if not app:
+        fallback_app = await db.scalar(select(App).where(App.id == app_id))
+        if fallback_app:
+            membership = await db.scalar(
+                select(OrganizationMember).where(
+                    OrganizationMember.user_id == org_ctx.user.id,
+                    OrganizationMember.org_id == fallback_app.organization_id,
+                )
+            )
+            if membership:
+                app = fallback_app
+        if not app:
+            raise HTTPException(status_code=404, detail="App not found")
+
+    findings = list(
+        await db.scalars(select(Finding).where(Finding.app_id == app.id))
+    )
+
+    csv_data = generate_csv_report(findings, app=app)
+    slug = re.sub(r"[^a-zA-Z0-9_-]", "-", app.name.lower())
+    return Response(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="straz-{slug}-findings.csv"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/orgs/{org_id}/branding")
