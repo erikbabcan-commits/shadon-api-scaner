@@ -39,7 +39,7 @@ async def create_api_key(
     """
     raw_token, key_prefix, key_hash = generate_raw_api_key()
     valid_scopes = ["ci:scan", "apps:read"] if scopes is None else scopes
-    if not set(valid_scopes).issubset({"ci:scan", "apps:read", "findings:read", "reports:read"}):
+    if not set(valid_scopes).issubset({"ci:scan", "ci:runs:read", "apps:read", "findings:read", "reports:read"}):
         raise HTTPException(status_code=422, detail="Unknown API key scope")
     if expires_at:
         expires_at = expires_at.replace(tzinfo=timezone.utc) if expires_at.tzinfo is None else expires_at
