@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased] — 2026-11-05
+
+### Documentation
+- Confirm main@ce12ee5 as the most advanced complete STRÁŽ source; compare all seven branches, available GitHub accounts, Vercel deployments, Supabase inventory and Notion notes.
+- Record CI evidence precisely: 127 backend tests on each of PG 16/18 and 19 frontend tests; distinguish live health from worker/browser acceptance.
+- Add Lovable frontend handoff, Hetzner migration plan, environment reference, API contract and documentation index.
+- Correct PoC stub, blocked CLI profiles, API key scopes, billing status, license evidence and obsolete readiness/compliance claims.
+- Sanitize environment examples, correct STRAZ_CORS_ORIGINS CSV and real Stripe setting names. No runtime code, schema, deployed configuration or production data changes.
+
+
 All notable changes to the **Stráž** security monitoring project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -12,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Split-Deploy Architecture:**
   - Added dynamic CORS configuration (`STRAZ_CORS_ORIGINS`) and cross-site cookie configuration (`STRAZ_COOKIE_SAMESITE`, `STRAZ_COOKIE_DOMAIN`) in `apps/api/app/config.py`.
-  - Configured Vercel deployment with [vercel.json](file:///c:/Users/magic/Documents/Projekty/ShadonsAPIpwa/apps/web/vercel.json) (SPA URL rewrites, security HTTP headers, caching headers).
+  - Configured Vercel deployment with [vercel.json](apps/web/vercel.json) (SPA URL rewrites, security HTTP headers, caching headers).
   - Dynamic API base URL resolution (`VITE_API_URL`) with automatic 401 redirect event dispatching in `apps/web/src/lib/api.ts`.
 - **Database Migrations:**
   - Integrated Alembic migrations with async SQLAlchemy engine support ([alembic.ini](file:///c:/Users/magic/Documents/Projekty/ShadonsAPIpwa/apps/api/alembic.ini), `alembic/env.py`).

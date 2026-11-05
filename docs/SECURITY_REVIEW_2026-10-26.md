@@ -1,5 +1,7 @@
 # STRÁŽ — nezávislá bezpečnostná kontrola, 26. 10. 2026
 
+> Historická bezpečnostná kontrola so svojím pôvodným commitom a rozsahom. Nové overenie z 5. 11. 2026 je v [PROJECT_STATUS.md](PROJECT_STATUS.md). Tento dokument sa nesmie vydávať za audit CVSS/PoC alebo SARIF/CSV doplnených neskôr. Aktuálny Caddy už má /healthz pravidlo; ostatné historické zistenia treba čítať s ich dátumom.
+
 Východiskový commit: `bda1d8f5caaf2ee73e81f1776287b747c6e530f3`.
 Rozsah: iba tento repozitár, izolované testy a čítanie GitHub metadát.
 Bez produkčných požiadaviek, migrácií, pushu alebo deployu.

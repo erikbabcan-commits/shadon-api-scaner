@@ -1,5 +1,7 @@
 # STRÁŽ — prevádzkové overenie a čakajúce rozhodnutia
 
+> Aktualizácia 5. 11. 2026: [overený stav](PROJECT_STATUS.md) a [Hetzner plán](HETZNER_BACKEND.md). Živá DB/Redis readiness bola potvrdená, worker, backup/restore a rotácia nie. Nasledujúce prevádzkové brány platia aj pre nový Hetzner backend; Railway-špecifické kroky patria k pôvodnému prostrediu. PR #4 je už zlúčený.
+
 Tento dokument je postup, nie potvrdenie vykonania v produkcii. Aktuálny stav
 Railway služieb, backupov a tajomstiev vyžaduje oprávnený platformový prístup.
 

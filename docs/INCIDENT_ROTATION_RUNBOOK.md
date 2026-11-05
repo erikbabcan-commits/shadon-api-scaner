@@ -1,5 +1,7 @@
 # STRÁŽ — pripravená rotácia kompromitovaných tajomstiev
 
+> Kontext 5. 11. 2026: incidentná oprava PR #4 je zahrnutá v main@ce12ee5. Vykonanie rotácie stále nebolo potvrdené. Presun na Hetzner ju nenahrádza; nové prostredie musí dostať nové hodnoty podľa [ENVIRONMENT.md](ENVIRONMENT.md).
+
 Stav: **pripravené, nevykonané**. Vyžaduje výslovné schválenie produkčného zásahu.
 Nálezy v historickom NOTION_NOTES.md sa považujú za kompromitované nezávisle od toho,
 či ešte zodpovedajú produkcii. Zmazanie zo stromu, .gitignore ani zelené CI nie sú rotácia.

@@ -1,44 +1,35 @@
-# STRÁŽ — kontrolovaný release Railway + Vercel
+# STRÁŽ — súčasné a cieľové nasadenie
 
-Tento postup je konfigurácia a checklist, nie dôkaz nasadenia. Staršie odhady
-„nasadenie do 3 minút“ ani úspešný build nepotvrdzujú celú produkčnú pripravenosť.
+Aktualizované 5. 11. 2026. Tento dokument je rozcestník, nie dôkaz presunu alebo release.
 
-## Existujúce prostredie
+| Vrstva | Súčasný zistený stav | Cieľ druhého kroku |
+|---|---|---|
+| Zdroj | shadon-api-scaner/main@ce12ee5, zelený CI | Rovnaký overený aplikačný základ |
+| Frontend | Vercel straz-monitoring, deployment uvádza 7b0ae28 | Vývoj v Lovable, potvrdený frontend hosting a doména |
+| API/worker | Posledný známy Railway dev-new; runtime SHA zatiaľ nepotvrdený | FastAPI a ARQ na Hetzner VPS |
+| Dáta | Živé readiness potvrdilo DB a Redis | Obnoviteľný PostgreSQL a trvalý Redis, kontrolovaný presun dát |
+| Stripe | Kód existuje, aktívna konfigurácia neoverená | Samostatná konfigurácia a test až v druhom kroku |
 
-Railway projekt `dev-new`, služby `straz-api`, `straz-worker`, PostgreSQL a Redis. Názvy overiť; nevytvárať duplicity.
-Vercel scope `h4ck3d`, projekt `straz-monitoring`.
-Verejné URL sú v NOTION_NOTES.md; interné DSN ani heslá do dokumentácie nepatria.
+## Poradie
 
-## Pred release
+1. [PROJECT_STATUS.md](PROJECT_STATUS.md): použiť main@ce12ee5, nie staré release vetvy alebo Vercel build.
+2. [LOVABLE_FRONTEND.md](LOVABLE_FRONTEND.md): preniesť frontend a zachovať externé auth/API.
+3. [HETZNER_BACKEND.md](HETZNER_BACKEND.md): opraviť backend-only Compose, ingress, perzistenciu a reprodukovateľný build.
+4. [ENVIRONMENT.md](ENVIRONMENT.md): skutočné názvy premenných a doménová/cookie topológia.
+5. [OPERATIONS_ACCEPTANCE.md](OPERATIONS_ACCEPTANCE.md): migrácie, dáta, backup/restore, worker a browserové overenie.
+6. Až potom vykonať cutover; Stripe nastaviť samostatne, bez obchádzania kvót.
 
-- Rotáciu kompromitovaných hodnôt rieši INCIDENT_ROTATION_RUNBOOK.md. Zmena main ju nevykoná.
-- Vyžadovať zelený secret gate, backend CI na PG 16/18, frontend testy, TypeScript a build.
-- Skontrolovať zálohu/restore a oprávnenia podľa OPERATIONS_ACCEPTANCE.md.
-- Osem CLI profilov ponechať blokovaných; dostupné sú Heartbeat a InternetDB.
+## Existujúci Railway kontext
 
-## Nastavenie služieb
+Projekt dev-new, služby straz-api, straz-worker, PostgreSQL a Redis; pred operáciou overiť identity.
+API/worker root: apps/api; Dockerfiles: Dockerfile a worker.Dockerfile.
+Migrácie sú samostatný krok `python -m app.migrations upgrade`; oba procesy potom kontrolujú head.
+Konfigurácie railway.api.json/railway.worker.json nie sú dôkazom ich efektívneho použitia.
 
-Root pre API/worker: apps/api. Dockerfile API: Dockerfile; worker: worker.Dockerfile.
-Pre-deploy API: python -m app.migrations upgrade. Štart a health definujú
-apps/api/railway.api.json a railway.worker.json. Ak platforma pre nový projekt vyžaduje
-IaC alebo nastavenia cez API, nastaviť ekvivalent a overiť efektívny config deploymentu;
-existencia súboru automaticky nedokazuje jeho použitie.
-API aj worker kontrolujú Alembic head. Worker nasadiť až po úspešnej migrácii.
-DATABASE_URL/REDIS_URL previazať na privátne služby; nevystavovať verejné DB porty.
-Produkčné cookie/CORS/frontend nastavenia určuje operátor. STRAZ_TRUSTED_PROXY_IPS
-nastaviť iba podľa overeného ingressu; nepoužiť wildcard. Hodnoty tajomstiev nevypisovať.
+Frontendové Vercel rewrites stále smerujú na Railway. Pri presune na Hetzner sa musia
+vedome zmeniť vrátane /healthz, CSP Report-Only a prípadných OpenAPI ciest.
+Push do Gitu nepreukazuje zmenu pripnutého Railway deploymentu.
 
-## Frontend a overenie
-
-Na vercel.app klient používa relatívne /api a rewrite na Railway. VITE_API_URL je
-verejná build konfigurácia pre iné hosty, nikdy úložisko backendových tajomstiev.
-CSP je v tomto PR iba Report-Only. Pre enforcement je nutný schválený preview/browser test.
-
-Po schválenom deployi overiť HTTPS liveness/readiness, DB aj Redis, HSTS, preflight,
-401 bez cookie, autorizovaný login/logout, scope a tenantové hranice a worker.
-POST kontroly, seed a testovací beh zapisujú, preto vyžadujú povolenie.
-API checklist nie je browser E2E a nenahrádza iPhone/Safari/PWA test.
-Pri commit pine deploy riadi operátor a push do main ho sám neaktualizuje.
-
-Výsledok release má obsahovať skutočne nasadené SHA API/workera/frontendu,
-vlastné výstupy kontrol a výslovne označené neoverené oblasti.
+Historická rotácia podľa [INCIDENT_ROTATION_RUNBOOK.md](INCIDENT_ROTATION_RUNBOOK.md)
+zostáva nepotvrdená. Žiadny existujúci zdroj, účet ani databáza sa nemajú zrušiť pred
+overeným presunom. Osem CLI profilov ostáva blokovaných na každej platforme.

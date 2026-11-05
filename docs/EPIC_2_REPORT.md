@@ -1,4 +1,6 @@
-> Historický implementačný report; nie dôkaz aktuálneho nasadenia alebo dostupnosti profilov. Aktuálny rozsah a stav: [NOTION_NOTES.md](../NOTION_NOTES.md).
+> Historický implementačný report. Aktualizácia 5. 11. 2026: [overený stav](PROJECT_STATUS.md), [API zmluva](API_CONTRACT.md), [cieľ Lovable/Hetzner](HETZNER_BACKEND.md). Opis implementácie nepreukazuje živé nasadenie.
+
+> Stripe sa nastaví až v druhom kroku. Rozšírené profily zostávajú globálne blokované bez ohľadu na plán; historické ceny/kvóty sú konfigurácia kódu, nie potvrdená obchodná ponuka.
 
 # EPIC 2 — Stripe Billing and Quota Engine Report
 
