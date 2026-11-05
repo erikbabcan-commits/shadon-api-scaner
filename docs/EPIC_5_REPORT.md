@@ -1,4 +1,6 @@
-> Historický implementačný report; nie dôkaz aktuálneho nasadenia alebo dostupnosti profilov. Aktuálny rozsah a stav: [NOTION_NOTES.md](../NOTION_NOTES.md).
+> Historický implementačný report. Aktualizácia 5. 11. 2026: [overený stav](PROJECT_STATUS.md), [API zmluva](API_CONTRACT.md), [cieľ Lovable/Hetzner](HETZNER_BACKEND.md). Opis implementácie nepreukazuje živé nasadenie.
+
+> Aktuálny CI default safe je blokovaný. Klient musí uviesť povolený profil; polling vyžaduje ci:scan, nie neimplementovaný ci:runs:read.
 
 # EPIC 5 — Scoped API Keys & DevSecOps CI/CD Gate Report
 
@@ -11,7 +13,7 @@ EPIC 5 equips Stráž with enterprise headless automation, enabling development 
   - SHA-256 hash storage: Plaintext token is shown strictly once upon creation; only SHA-256 hash and 16-character display prefix are stored in the database.
   - Granular scopes: `ci:scan`, `apps:read`, `findings:read`, `reports:read`.
 - **Authentication & RBAC (`app/deps.py`)**:
-  - Bearer API key authentication (`Authorization: Bearer straz_live_...` or `X-API-Key`).
+  - Bearer API key authentication (`Authorization: Bearer straz_live_...`).
   - Strict tenant scoping: API key forces organization context to the creator's workspace; cross-tenant headers are rejected.
   - Automatic `last_used_at` updating and expiration enforcement.
 - **Headless CI/CD Engine (`app/routers/ci.py`, `app/services/ci.py`)**:

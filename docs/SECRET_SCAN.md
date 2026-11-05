@@ -1,5 +1,7 @@
 # Secret gate a historický incident
 
+> Overenie 5. 11. 2026: secret gate na main@ce12ee5 bol zelený. Týka sa daného CI runu, nie celej histórie alebo rotácie. Aktuálny prehľad: [PROJECT_STATUS.md](PROJECT_STATUS.md).
+
 CI používa Gitleaks 8.30.1, oficiálny Linux x64 archív overený pripnutým SHA-256.
 Job `secret-scan` blokuje backend aj frontend jobs na PR do main/master a na push
 do main/master/develop. Vyžadované status checks na GitHube musí vynútiť vlastník
