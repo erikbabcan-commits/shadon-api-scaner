@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 import os
+import signal
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -95,25 +96,111 @@ async def run_heartbeat(url: str, timeout: float = 10.0) -> HeartbeatResult:
         return HeartbeatResult(ok=False, status_code=None, latency_ms=None, title=None, error="Target unavailable or blocked")
 
 
+SCANNER_OUTPUT_LIMIT_BYTES = 4 * 1024 * 1024
+
+
+class _ScannerProcessOutput(asyncio.SubprocessProtocol):
+    """Bound both pipes together without communicate()'s unbounded buffering."""
+
+    def __init__(self) -> None:
+        loop = asyncio.get_running_loop()
+        self.closed = loop.create_future()
+        self.limit_hit = loop.create_future()
+        self.buffers = {1: bytearray(), 2: bytearray()}
+        self.size = 0
+        self.pipe_error = False
+
+    def pipe_data_received(self, fd: int, data: bytes) -> None:
+        remaining = max(0, SCANNER_OUTPUT_LIMIT_BYTES - self.size)
+        retained = data[:remaining]
+        self.buffers[fd].extend(retained)
+        self.size += len(retained)
+        if len(data) > remaining and not self.limit_hit.done():
+            self.limit_hit.set_result(None)
+
+    def pipe_connection_lost(self, fd: int, exc: Exception | None) -> None:
+        self.pipe_error |= exc is not None
+
+    def connection_lost(self, exc: Exception | None) -> None:
+        self.pipe_error |= exc is not None
+        if not self.closed.done():
+            self.closed.set_result(None)
+
+
+async def _close_scanner_process(started: asyncio.Task, output: _ScannerProcessOutput) -> None:
+    try:
+        transport, _ = await started
+    except (OSError, ValueError):
+        return  # Creation failed before a transport was returned.
+    try:
+        if os.name == "posix":
+            # start_new_session makes this group ours. Kill it even when the
+            # root exited successfully but left a background child behind.
+            try:
+                os.killpg(transport.get_pid(), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        elif transport.get_returncode() is None:
+            # Linux/macOS are the deployed platforms. Windows has no killpg;
+            # this fallback can only guarantee the direct process is stopped.
+            transport.kill()
+    finally:
+        # Public transport API closes all pipe handles as well as the root;
+        # escaped children cannot hold the parent's readers open indefinitely.
+        transport.close()
+    try:
+        await asyncio.wait_for(asyncio.shield(output.closed), timeout=5)
+    except TimeoutError:
+        raise RuntimeError("Scanner process cleanup failed") from None
+
+
+async def _wait_scanner_cleanup(cleanup: asyncio.Task) -> None:
+    cancelled = False
+    while not cleanup.done():
+        try:
+            await asyncio.shield(cleanup)
+        except asyncio.CancelledError:
+            # Repeated cancellation must not abandon process cleanup.
+            cancelled = True
+    cleanup.result()
+    if cancelled:
+        raise asyncio.CancelledError
+
+
 async def _run_cmd(args: list[str], timeout: float = 120.0) -> tuple[int, str, str]:
-    proc = await asyncio.create_subprocess_exec(
+    """Bound output and process lifetime; this is not network/filesystem isolation."""
+    output = _ScannerProcessOutput()
+    started = asyncio.create_task(asyncio.get_running_loop().subprocess_exec(
+        lambda: output,
         *args,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        env={key: value for key, value in os.environ.items() if key in {"PATH", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"}},
-    )
+        close_fds=True,
+        env={key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR") if key in os.environ},
+        **({"start_new_session": True} if os.name == "posix" else {}),
+    ))
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        async with asyncio.timeout(timeout):
+            # Keep creation alive long enough to obtain and clean its transport
+            # if the caller cancels in the process-spawn window.
+            transport, _ = await asyncio.shield(started)
+            await asyncio.wait((output.closed, output.limit_hit), return_when=asyncio.FIRST_COMPLETED)
+            if output.limit_hit.done():
+                raise RuntimeError("Scanner output exceeded limit")
+            if output.pipe_error:
+                raise RuntimeError("Scanner output could not be read")
+            code = transport.get_returncode()
+            if code not in (0, 1) or (code == 1 and Path(args[0]).name != "gitleaks"):
+                raise RuntimeError(f"Scanner process failed (exit {code})")
+            return code, output.buffers[1].decode("utf-8", errors="replace"), output.buffers[2].decode("utf-8", errors="replace")
     except TimeoutError:
-        proc.kill()
-        await proc.communicate()
         raise RuntimeError("Scanner timed out") from None
-    code = proc.returncode or 0
-    if code not in (0, 1) or (code == 1 and Path(args[0]).name != "gitleaks"):
-        raise RuntimeError(f"Scanner process failed (exit {code})")
-    return code, stdout.decode("utf-8", errors="replace"), stderr.decode(
-        "utf-8", errors="replace"
-    )
+    finally:
+        try:
+            await _wait_scanner_cleanup(asyncio.create_task(_close_scanner_process(started, output)))
+        finally:
+            output.limit_hit.cancel()
 
 
 async def run_tlsx(host: str) -> list[ToolFinding]:
