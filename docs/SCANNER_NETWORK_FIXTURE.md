@@ -22,6 +22,13 @@ zostávajú otvorené; stdin fixture nepreukazuje sken celej Git histórie.
 Opakovateľný test na schválenom Linux Docker hoste:
 `python3 scripts/verify_scanner_gitleaks.py --image-id sha256:<schválený-lokálny-image>`.
 Image musí už existovať; skript nič nesťahuje a nespúšťa produkčné joby.
+Na schválenom Linux AMD64 hoste ho pripraví
+`python3 scripts/build_scanner_gitleaks.py`: oficiálny release 8.30.1,
+pevný SHA-256, obmedzená veľkosť downloadu, extrakcia iba regulárneho binárneho
+súboru, lokálny digestom pinovaný BusyBox základ bez pullu a build bez siete.
+Builder ani verifier neaktivujú profily aplikácie. Oba skripty boli spolu
+reálne spustené na zvolenom VPS 2026-11-06; čistý vstup, syntetický nález,
+redakcia výsledku aj zachovanie pôvodných bežiacich kontajnerov prešli.
 
 `deploy/scanner_policy.py` kompiluje presné verejné IP/TCP port páry, nie ich
 kartézsky súčin. DNS, nesúvisiace ciele a ostatná komunikácia nemajú povolenie.
