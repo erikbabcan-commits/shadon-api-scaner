@@ -1,0 +1,60 @@
+import base64
+import importlib
+from pathlib import Path
+import socket
+import uuid
+
+import pytest
+
+
+@pytest.fixture
+def dispatcher(monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[3] / 'deploy'))
+    return importlib.import_module('scanner_job')
+
+
+def job(profile='tls'):
+    return {'version': 1, 'job_id': str(uuid.uuid4()), 'profile': profile,
+            'target': {'hostname': 'authorized.example', 'port': 443}}
+
+
+def test_mixed_dns_answers_rejected_before_scanner(dispatcher, monkeypatch):
+    monkeypatch.setattr(socket, 'getaddrinfo', lambda *args, **kwargs: [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, '', (address, 443))
+        for address in ('1.1.1.1', '127.0.0.1')])
+    with pytest.raises(ValueError):
+        dispatcher.resolve_target('authorized.example', 443)
+
+
+def test_all_addresses_complete_before_job_success(dispatcher, monkeypatch):
+    monkeypatch.setattr(dispatcher, 'resolve_target', lambda *args: ['1.1.1.1', '8.8.8.8'])
+    calls = []
+    def scan(guard, image, host, address, port):
+        calls.append(address)
+        if address == '8.8.8.8':
+            raise RuntimeError('Synthetic second endpoint failure')
+        return {'findings': []}
+    monkeypatch.setattr(dispatcher.scanner_tlsx, 'scan', scan)
+    with pytest.raises(RuntimeError):
+        dispatcher.execute(job(), {'guard': 'sha256:' + 'a' * 64, 'tls': 'sha256:' + 'b' * 64})
+    assert calls == ['1.1.1.1', '8.8.8.8']
+
+
+@pytest.mark.parametrize('extra', ['argv', 'image', 'command', 'environment'])
+def test_job_cannot_choose_execution_configuration(dispatcher, extra):
+    envelope = job()
+    envelope[extra] = 'untrusted'
+    with pytest.raises(ValueError, match='Unexpected'):
+        dispatcher.execute(envelope, {})
+
+
+def test_source_job_returns_only_adapter_metadata(dispatcher, monkeypatch):
+    envelope = {'version': 1, 'job_id': str(uuid.uuid4()), 'profile': 'gitleaks',
+                'source_base64': base64.b64encode(b'synthetic source').decode()}
+    def scan(image, source):
+        assert source == b'synthetic source'
+        return []
+    monkeypatch.setattr(dispatcher.scanner_gitleaks, 'scan', scan)
+    result = dispatcher.execute(envelope, {'gitleaks': 'sha256:' + 'a' * 64})
+    assert result['job_id'] == envelope['job_id'] and result['observations_complete'] is True
+    assert 'source_base64' not in result and result['result'] == {'findings': []}

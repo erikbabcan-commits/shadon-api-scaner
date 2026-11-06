@@ -1,5 +1,17 @@
 # Sieťová fixture pre budúci scanner runner
 
+`deploy/scanner_job.py` poskytuje verzované dôveryhodné job rozhranie pre
+Gitleaks stdin, TLS a obmedzené HTTP pozorovanie. Identita je kanonické UUID,
+job nesmie vyberať príkaz, image ani env. Images sú pevná konfigurácia operátora.
+Sieťový dispatch raz vyrieši DNS, odmietne akúkoľvek neverejnú odpoveď a
+vyžaduje úspech všetkých adries. Čiastočný výsledok neoznačí ako kompletný.
+Reálny dispatch všetkých troch adaptérov do kontajnerov na VPS prešiel;
+HTTP readiness vlastného backendu vrátil 200.
+[Dôkaz a presný rozsah](evidence/scanner-job-live-2026-11-06.json).
+Rozhranie samo nevykonáva tenantové oprávnenia, kvóty, autentifikovaný transport
+ani trvalú idempotenciu. Nie je verejná služba a nesmie sa tak vystaviť.
+Tieto integračné hranice a ďalších päť profilov zostávajú otvorené.
+
 HTTP pozorovanie `deploy/scanner_httpx.py` používa HTTPX 1.6.10, presnú verejnú
 IP/port, explicitné Host/SNI, HTTPS bez fallbacku a bez nasledovania redirectov.
 Čítanie odpovede je limitované na 128 KiB a výsledok obsahuje iba stavový kód

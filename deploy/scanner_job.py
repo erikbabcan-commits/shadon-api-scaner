@@ -1,0 +1,75 @@
+"""Trusted supervisor job dispatch, not a public or authenticated service.
+
+Application admission must authorize tenant/target/quota before calling this.
+Images belong to operator configuration; jobs cannot choose commands or images.
+"""
+import base64
+import binascii
+import ipaddress
+import re
+import socket
+import uuid
+
+import scanner_gitleaks
+import scanner_httpx
+import scanner_tlsx
+from scanner_policy import compile_policy
+
+
+def resolve_target(hostname, port):
+    if (not isinstance(hostname, str) or len(hostname) > 253
+        or not all(re.fullmatch(r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?', part)
+                   for part in hostname.split('.'))):
+        raise ValueError('Invalid authorized hostname')
+    if type(port) is not int or not 1 <= port <= 65535:
+        raise ValueError('Invalid authorized port')
+    answers = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    addresses = {str(ipaddress.ip_address(answer[4][0])) for answer in answers}
+    # Reject mixed public/private answers, not merely the first selected answer.
+    compile_policy([(address, port) for address in addresses])
+    return sorted(addresses, key=lambda address: (ipaddress.ip_address(address).version, address))
+
+
+def execute(job, images):
+    if not isinstance(job, dict) or job.get('version') != 1 or type(job.get('version')) is not int:
+        raise ValueError('Invalid scanner job version')
+    try:
+        identity = str(uuid.UUID(job['job_id']))
+    except (KeyError, ValueError, TypeError, AttributeError):
+        raise ValueError('Invalid scanner job identity') from None
+    if identity != job['job_id']:
+        raise ValueError('Require canonical scanner job identity')
+    profile = job.get('profile')
+    if profile not in ('tls', 'http', 'gitleaks'):
+        raise ValueError('Unsupported isolated profile')
+    expected = {'version', 'job_id', 'profile', 'source_base64' if profile == 'gitleaks' else 'target'}
+    if set(job) != expected:
+        raise ValueError('Unexpected scanner job fields')
+    keys = (profile,) if profile == 'gitleaks' else ('guard', profile)
+    if (not isinstance(images, dict) or any(not isinstance(images.get(key), str)
+        or not re.fullmatch(r'sha256:[a-f0-9]{64}', images[key]) for key in keys)):
+        raise ValueError('Missing approved immutable scanner image')
+    if profile == 'gitleaks':
+        encoded = job['source_base64']
+        if not isinstance(encoded, str) or len(encoded) > 1398104:
+            raise ValueError('Invalid scanner source input')
+        try:
+            source = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error):
+            raise ValueError('Invalid scanner source encoding') from None
+        if len(source) > 1024 * 1024:
+            raise ValueError('Scanner source exceeds limit')
+        result = {'findings': scanner_gitleaks.scan(images[profile], source)}
+    else:
+        target = job['target']
+        allowed = {'hostname', 'port', 'path'} if profile == 'http' else {'hostname', 'port'}
+        if not isinstance(target, dict) or not {'hostname', 'port'} <= set(target) or set(target) - allowed:
+            raise ValueError('Invalid authorized scanner target')
+        addresses = resolve_target(target['hostname'], target['port'])
+        adapter = scanner_tlsx if profile == 'tls' else scanner_httpx
+        extra = {'path': target.get('path', '/')} if profile == 'http' else {}
+        # All resolved endpoints must complete. Never return partial success.
+        result = {'endpoints': [adapter.scan(images['guard'], images[profile],
+            target['hostname'], address, target['port'], **extra) for address in addresses]}
+    return {'version': 1, 'job_id': identity, 'profile': profile,
+            'observations_complete': True, 'result': result}
