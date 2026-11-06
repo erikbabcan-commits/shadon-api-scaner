@@ -1,5 +1,28 @@
 # Sieťová fixture pre budúci scanner runner
 
+Offline procesná vrstva je v `deploy/scanner_process.py` a
+`deploy/scanner_offline.py`: vstup najviac 1 MiB, spoločný limit stdout/stderr,
+deadline aj pri zdedených alebo zavretých rúrach, ukončenie procesnej skupiny
+a odstránenie kontajnerov podľa jedinečného vlastníckeho labelu. Offline
+kontajner má `network=none`, nemenný lokálny image, read-only root, non-root
+používateľa, zahodené capabilities a obmedzené CPU/RAM/PID. Rozhranie je iba
+pre dôveryhodný host supervisor, nie pre príkazy z tenantového HTTP vstupu.
+Regresné testy overujú reálne lokálne procesy a mockované Docker riadenie.
+Navyše reálny Docker na zvolenom VPS prešiel syntetickým stdin roundtripom,
+timeoutom, prekročením výstupu aj cleanupom; pôvodné kontajnery zostali bežať.
+[Dôkaz a hashe zdrojov](evidence/scanner-offline-live-2026-11-06.json).
+Samostatne prešiel aj Gitleaks 8.30.1 v reálnom offline kontajneri:
+čistý stdin a detekcia syntetického tokenu, allowlist výsledných metadát bez
+hodnoty tajomstva a odstránenie vlastných kontajnerov.
+[Dôkaz, release checksum a image ID](evidence/scanner-gitleaks-live-2026-11-06.json).
+Adaptér `deploy/scanner_gitleaks.py` nevracia zdrojový text, cestu, fingerprint
+ani voľný opis z reportu. Chybný JSON, zlyhanie nástroja a nekonzistentný exit
+kód znamenajú chybu. Získanie Git repozitára a aktivácia aplikačných profilov
+zostávajú otvorené; stdin fixture nepreukazuje sken celej Git histórie.
+Opakovateľný test na schválenom Linux Docker hoste:
+`python3 scripts/verify_scanner_gitleaks.py --image-id sha256:<schválený-lokálny-image>`.
+Image musí už existovať; skript nič nesťahuje a nespúšťa produkčné joby.
+
 `deploy/scanner_policy.py` kompiluje presné verejné IP/TCP port páry, nie ich
 kartézsky súčin. DNS, nesúvisiace ciele a ostatná komunikácia nemajú povolenie.
 Pravidlá sú určené výhradne do nového job network namespace pred štartom skenera,
