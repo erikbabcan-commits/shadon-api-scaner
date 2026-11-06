@@ -1,4 +1,3 @@
-import asyncio
 import os
 import uuid
 import socket
@@ -17,7 +16,7 @@ os.environ["STRAZ_SESSION_SECRET"] = "test-session-secret-at-least-32-chars-long
 os.environ["STRAZ_ADMIN_PASSWORD"] = "test-admin-secret-password-123"
 os.environ["STRIPE_WEBHOOK_SECRET"] = "local-signing-secret-for-unit-tests"
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.db import Base, get_db
 from app.main import app
 from app.models import User

@@ -113,7 +113,6 @@ async def test_schedule_keeps_flags_verification_entitlements_and_quota(db_sessi
                                internetdb=case == "unverified", status="past_due" if case == "past_due" else "active")
     org = await db_session.get(Organization, org_id)
     app = await db_session.get(App, app_id)
-    profile = ScanProfile.heartbeat
     if case == "unverified":
         app.heartbeat_enabled = False
     if case == "expired":
@@ -126,7 +125,6 @@ async def test_schedule_keeps_flags_verification_entitlements_and_quota(db_sessi
     if case == "cli":
         app.heartbeat_enabled = False
         app.http_enabled = True
-        profile = ScanProfile.http
     await db_session.commit()
     queue = Queue()
     await dispatch(db_session, monkeypatch, queue, scheduling.utc_now())

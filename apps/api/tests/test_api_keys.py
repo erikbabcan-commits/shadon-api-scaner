@@ -14,7 +14,6 @@ from app.models import (
     OrganizationMember,
     OrgRole,
     RunStatus,
-    ScanProfile,
     ScanRun,
     Target,
     TargetStatus,
@@ -160,7 +159,6 @@ async def test_api_key_scope_enforcement(client: AsyncClient, db_session: AsyncS
 
     # Accessing endpoint requiring "findings:read" or non-granted scope
     # (or test require_scope in deps)
-    from app.deps import require_scope
 
     # Let's test calling CI scan endpoint (has "ci:scan" scope)
     # Target missing -> 404/400 (not 403 scope error)

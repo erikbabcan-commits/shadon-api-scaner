@@ -1,16 +1,13 @@
 import uuid
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
-from app.models import App, Finding, FindingSeverity, FindingSource, FindingStatus, Organization, User, OrgRole
+from app.models import App, Finding, FindingSeverity, FindingSource, Organization, User
 from app.services.cvss import (
     calculate_cvss,
     calculate_cvss_pure,
     parse_cvss_vector,
-    build_vector_string,
-    severity_from_score,
 )
 from app.services.findings import upsert_finding
 

@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models import App, Organization, OrganizationMember, OrgRole, User
+from app.models import Organization, OrganizationMember, OrgRole, User
 from app.security import create_session_token, hash_password
 
 
