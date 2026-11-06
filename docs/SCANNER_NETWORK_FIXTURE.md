@@ -1,5 +1,18 @@
 # Sieťová fixture pre budúci scanner runner
 
+Offline source handoff teraz prijíma iba nekomprimovaný tar do 4 MiB.
+`deploy/scanner_archive.py` validuje členov bez hostiteľskej extrakcie:
+odmieta traversal, absolútne/duplicitné cesty, odkazy a špeciálne súbory.
+Rozbaľovanie prebehne iba v novom offline kontajneri na noexec tmpfs,
+bez host bind mountu. Repo konfigurácia/ignore súbor nesmie potlačiť Gitleaks
+pravidlá: explicitný config rozširuje vstavané pravidlá, ignore cesta je
+`/dev/null` a allow komentáre sú vypnuté. Reálny syntetický archive scan na VPS
+zachytil token aj napriek repo allowlistu a vrátil iba redigované metadáta
+s relatívnou cestou súboru.
+[Dôkaz](evidence/scanner-archive-live-2026-11-06.json).
+Väčšie archívy a repozitáre s odkazmi zlyhajú explicitne; nevracajú čistý sken.
+Priame Git → archive prepojenie a plná Git história zostávajú otvorené.
+
 Git acquisition command builder `deploy/scanner_git.py` prijíma iba HTTPS URL
 bez credentials/query/fragmentu, explicitnú verejnú IP a pevný sandbox cieľ.
 Používa `http.curloptResolve`, TLS verification, zákaz redirectov, hooks,

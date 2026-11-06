@@ -11,8 +11,11 @@ import subprocess
 import time
 
 
-def run_bounded(argv, data=b'', *, timeout=30, max_output=4 * 1024 * 1024):
-    if not isinstance(data, bytes) or len(data) > 1024 * 1024:
+def run_bounded(argv, data=b'', *, timeout=30, max_output=4 * 1024 * 1024,
+                max_input=1024 * 1024):
+    if type(max_input) is not int or max_input not in (1024 * 1024, 4 * 1024 * 1024):
+        raise ValueError('Invalid approved scanner input limit')
+    if not isinstance(data, bytes) or len(data) > max_input:
         raise ValueError('Scanner input exceeds limit')
     if not math.isfinite(timeout) or timeout <= 0 or type(max_output) is not int or max_output <= 0:
         raise ValueError('Invalid scanner limits')
