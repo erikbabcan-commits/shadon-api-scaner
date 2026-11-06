@@ -1,0 +1,335 @@
+{
+  "verified_at_utc": "2026-11-06T03:21:53.474162+00:00",
+  "base_url": "https://straz-security-beacon.lovable.app",
+  "user_agent": "Mozilla/5.0",
+  "authenticated": false,
+  "source_main": "94694aa7d5532cda51290e51ca31201926f4752c",
+  "source_ci_run": "42155566421",
+  "source_ci_url": "https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42155566421",
+  "source_note": "Source/CI reference supplied by the parent; the public HTTP responses do not expose a deployment commit SHA.",
+  "checks": 12,
+  "passed": 12,
+  "sanitization": "Only allowlisted response headers and generic JSON fields retained; no cookies, authorization data, raw HTML or tokens stored.",
+  "results": [
+    {
+      "case": "root",
+      "method": "GET",
+      "path": "/",
+      "expected_status": 200,
+      "status": 200,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache, must-revalidate, max-age=0",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "html_response": true,
+      "cloudflare_challenge_detected": false,
+      "cache_revalidation": true,
+      "passed": true
+    },
+    {
+      "case": "auth_me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "expected_status": 401,
+      "status": 401,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Not authenticated"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_liveness",
+      "method": "GET",
+      "path": "/healthz/liveness",
+      "expected_status": 200,
+      "status": 200,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "status": "ok"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_readiness",
+      "method": "GET",
+      "path": "/healthz/readiness",
+      "expected_status": 200,
+      "status": 200,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "status": "healthy",
+        "ready": true
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_unknown",
+      "method": "GET",
+      "path": "/healthz/other",
+      "expected_status": 404,
+      "status": 404,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Not found"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "logout_missing_origin",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "expected_status": 403,
+      "status": 403,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Cross-origin request rejected"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "logout_foreign_origin",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "expected_status": 403,
+      "status": 403,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Cross-origin request rejected"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_reject_post",
+      "method": "POST",
+      "path": "/healthz/readiness",
+      "expected_status": 405,
+      "status": 405,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Method not allowed"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_reject_put",
+      "method": "PUT",
+      "path": "/healthz/readiness",
+      "expected_status": 405,
+      "status": 405,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Method not allowed"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_reject_patch",
+      "method": "PATCH",
+      "path": "/healthz/readiness",
+      "expected_status": 405,
+      "status": 405,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Method not allowed"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_reject_delete",
+      "method": "DELETE",
+      "path": "/healthz/readiness",
+      "expected_status": 405,
+      "status": 405,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Method not allowed"
+      },
+      "json_response": true,
+      "passed": true
+    },
+    {
+      "case": "health_reject_options",
+      "method": "OPTIONS",
+      "path": "/healthz/readiness",
+      "expected_status": 405,
+      "status": 405,
+      "transport_ok": true,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store, private",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "pragma": "no-cache",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+      },
+      "security_headers_ok": true,
+      "no_store": true,
+      "pragma_no_cache": true,
+      "json": {
+        "detail": "Method not allowed"
+      },
+      "json_response": true,
+      "passed": true
+    }
+  ],
+  "optional_public_preview": {
+    "base_url": "https://64e9eb25-5f23-4709-8d7f-6d0ee0fde5c9.lovableproject.com",
+    "authenticated": false,
+    "api_status": 401,
+    "transport_ok": true,
+    "content_type": "text/plain; charset=UTF-8",
+    "application_json": false,
+    "stopped_without_bypass": true,
+    "note": "Public request did not return the application unauthenticated JSON; authenticated browser preview proof is maintained separately by the parent agent."
+  }
+}

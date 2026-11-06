@@ -89,9 +89,46 @@ na logout **403** a nepovolené health metódy **405**. API/health odpovede maj�
 X-Frame-Options DENY a CSP Report-Only. CSP Report-Only na HTML zatiaľ iba
 reportuje porušenia, nevynucuje túto politiku.
 
-Bez prihlasovania sa neoverili reálne session cookies ani iPhone. Produkčné
-skeny a notifikácie sa nespúšťali. V cloudovom `AGENTS.md` zostáva doplniť
-poznámku o health routách; funkčné routy sú vo finálnom exporte aj produkcii.
+Bez prihlasovania sa neoverili reálne produkčné session cookies ani iPhone.
+Produkčné skeny a notifikácie sa nespúšťali. Health pravidlá v `AGENTS.md`
+boli následne doplnené v samostatnom frontendovom repozitári.
+
+### Finálny samostatný frontend
+
+Zdrojom je súkromný [youh4ck3dme/straz-security-beacon](https://github.com/youh4ck3dme/straz-security-beacon).
+[PR #1](https://github.com/youh4ck3dme/straz-security-beacon/pull/1) a
+[PR #2](https://github.com/youh4ck3dme/straz-security-beacon/pull/2) sú zlúčené
+merge commitmi bez prepisovania histórie. `main` je
+`94694aa7d5532cda51290e51ca31201926f4752c`; jeho
+[CI 42155566421](https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42155566421)
+úspešne vykonalo frozen Bun install, produkčný audit, **71 testov**, TypeScript
+a produkčný build. Toto je nezávislé CI frontendu na účte `youh4ck3dme`, nie
+odblokovanie backendového CI na účte `erikbabcan-commits`.
+
+Vite je **8.1.6**, Zod **4.6.6**, Vitest **4.1.12**, seroval **1.6.11**.
+Produkčný audit má **0 nálezov**. Full audit má **3 vývojové nálezy**
+(1 low, 2 moderate, 0 high/critical), s presnými reťazcami v frontendovom
+`docs/DEPENDENCY_AUDIT.md`; neboli použité force ani nekompatibilné overrides.
+
+Lokálny DEV má samostatný loopback upstream a nikdy implicitne nepoužije
+produkciu. Hosted Lovable DEV sa rozpoznáva podľa dôveryhodných serverových
+markerov `LOVABLE_SANDBOX` a `DEV_SERVER__PROJECT_PATH`, rovnako ako oficiálny
+vendor config. Používa pevný HTTPS backend. Táto oprava odstránila používateľom
+potvrdenú chybu 502 v náhľade bez rozhodovania podľa klientského Host headera.
+Po synchronizácii a aktualizácii náhľadu IAB zobrazilo prihlásenie a preview
+`/api/auth/me` zobrazilo JSON `Not authenticated`. Verejný preview endpoint
+ostal chránený; jeho auth gate sa neobchádzal.
+
+Finálny snapshot bol publikovaný cez UI s potvrdením **Your website was updated**.
+Po publikovaní prešla čerstvá produkčná kontrola **12/12** o
+**03:21:53 UTC, 6. 11. 2026**; podrobnosti sú v
+[novom sanitizovanom dôkaze](evidence/lovable-production-final-2026-11-06.json).
+IAB po reloadnutí publikovanej adresy zobrazilo funkčné prihlásenie bez chyby.
+
+Lokálna pracovná kópia `frontend` je na rovnakom `main`, dev server počúva na
+`0.0.0.0:8080`. Reálny lokálny login/me/orgs/CSRF/logout tok prešiel **7/7**
+kontrolami s HttpOnly cookie a `no-store`; produkčné prihlásenie sa nepoužilo.
+Po poslednej oprave je LAN readiness `ready=true` a neprihlásené auth/me je 401.
 
 ## Verejne overená produkcia
 
@@ -152,8 +189,9 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
 1. Doriešiť alebo výslovne akceptovať zostávajúce dev advisories, dokončiť
    kontajnerové kontroly, skontrolovať finálny diff
    a získať nový overený commit s aktuálnymi CI výsledkami vrátane PostgreSQL 16/18.
-2. Doplniť overenie produkčného prihlásenia/cookies v prehliadači a na iPhone.
-   Publikovanie Lovable a verejné API prepojenie sú overené vyššie.
+2. Doplniť overenie produkčného prihlásenia/cookies a skutočného iPhone.
+   Publikovanie, opravený Lovable náhľad, produkčné rozhranie a verejné API
+   prepojenie sú overené vyššie. Lokálny HTTP login nie je produkčný login.
 3. Cez obnovený Railway dashboard prístup overiť worker, ingress trust boundary,
    HSTS a bezpečný upgrade potvrdenej revízie 008 na aktuálny head 009;
    následne overiť nasadenie aktuálnych backendových opráv. Stav CLI prihlásenia
