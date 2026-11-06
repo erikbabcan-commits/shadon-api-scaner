@@ -1,5 +1,15 @@
 # Sieťová fixture pre budúci scanner runner
 
+HTTP pozorovanie `deploy/scanner_httpx.py` používa HTTPX 1.6.10, presnú verejnú
+IP/port, explicitné Host/SNI, HTTPS bez fallbacku a bez nasledovania redirectov.
+Čítanie odpovede je limitované na 128 KiB a výsledok obsahuje iba stavový kód
+a prípadný server-error nález. Nevracia telo, hlavičky ani titulok stránky.
+Pri reálnom teste vlastný `/healthz/readiness` vrátil 200.
+128 MiB test skončil exit 137 bez reportu; následný 256 MiB beh prešiel.
+Supervisor povoľuje iba pevné rozpočty 128/256 MiB, zvyšok limitov zachováva.
+[Dôkaz a image checksum](evidence/scanner-httpx-live-2026-11-06.json).
+Toto ešte nie je aplikačne zapnutý HTTP profil ani detekcia technológií.
+
 `deploy/scanner_network.py` spustí dôveryhodný profilový adaptér až v guard
 namespace s overenou politikou. Používa nemenné lokálne images, limitované
 rúry, timeout najviac 900 s, non-root/read-only sandbox bez capabilities a

@@ -12,7 +12,7 @@ from scanner_process import run_bounded
 
 
 def run_network(guard_image, scanner_image, argv, endpoints, data=b'', *, timeout=30,
-                max_output=4 * 1024 * 1024):
+                max_output=4 * 1024 * 1024, memory_mib=128):
     if any(not re.fullmatch(r'sha256:[a-f0-9]{64}', value)
            for value in (guard_image, scanner_image)):
         raise ValueError('Require approved immutable local images')
@@ -25,6 +25,8 @@ def run_network(guard_image, scanner_image, argv, endpoints, data=b'', *, timeou
     if (not math.isfinite(timeout) or not 0 < timeout <= 900
         or type(max_output) is not int or not 0 < max_output <= 4 * 1024 * 1024):
         raise ValueError('Invalid scanner limits')
+    if type(memory_mib) is not int or memory_mib not in (128, 256):
+        raise ValueError('Invalid approved scanner memory limit')
     docker('image', 'inspect', scanner_image)
     with policy_guard(guard_image, endpoints) as guard:
         container = guard['container_id']
@@ -36,8 +38,8 @@ def run_network(guard_image, scanner_image, argv, endpoints, data=b'', *, timeou
                 '--name', 'straz-network-' + job, '--label', 'straz.network=' + job,
                 '--network', 'container:' + container, '--read-only',
                 '--user', '10001:10001', '--cap-drop', 'ALL',
-                '--security-opt', 'no-new-privileges', '--memory', '128m',
-                '--memory-swap', '128m', '--cpus', '0.5', '--pids-limit', '32',
+                '--security-opt', 'no-new-privileges', '--memory', f'{memory_mib}m',
+                '--memory-swap', f'{memory_mib}m', '--cpus', '0.5', '--pids-limit', '32',
                 '--ipc', 'none', '--log-driver', 'none',
                 '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=16m',
                 '--entrypoint', argv[0], scanner_image, *argv[1:]], data,

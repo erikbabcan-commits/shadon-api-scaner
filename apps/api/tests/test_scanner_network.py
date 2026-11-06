@@ -57,3 +57,11 @@ def test_policy_failure_never_launches_scanner(network, monkeypatch):
     with pytest.raises(RuntimeError, match='Policy failed'):
         network.run_network('sha256:' + 'a' * 64, 'sha256:' + 'b' * 64,
                             ['/bin/cat'], [('1.1.1.1', 443)])
+
+
+@pytest.mark.parametrize('memory', [0, 129, 512, True, '256'])
+def test_unapproved_memory_budget_rejected_before_docker(network, monkeypatch, memory):
+    monkeypatch.setattr(network, 'docker', lambda *args: pytest.fail('Docker called'))
+    with pytest.raises(ValueError):
+        network.run_network('sha256:' + 'a' * 64, 'sha256:' + 'b' * 64,
+                            ['/bin/cat'], [('1.1.1.1', 443)], memory_mib=memory)
