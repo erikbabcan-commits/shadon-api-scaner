@@ -43,6 +43,8 @@ def source_hashes():
     paths = [path for path in (ROOT / "apps/api").rglob("*.py")
              if ".venv" not in path.parts and "__pycache__" not in path.parts]
     paths.extend((ROOT / "apps/api/typings").rglob("*.pyi"))
+    paths.extend((ROOT / "deploy").glob("scanner_*.py"))
+    paths.extend((ROOT / "scripts").glob("*scanner*.py"))
     paths.extend([ROOT / "apps/api/uv.lock", ROOT / "apps/api/pyproject.toml", ROOT / "deploy/staging.py",
                   ROOT / "deploy/docker-compose.yml", ROOT / "deploy/docker-compose.staging.yml", Path(__file__)])
     return [{"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
