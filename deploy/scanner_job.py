@@ -13,6 +13,7 @@ import uuid
 import scanner_gitleaks
 import scanner_git
 import scanner_httpx
+import scanner_naabu
 import scanner_tlsx
 from scanner_policy import compile_policy
 
@@ -41,7 +42,7 @@ def execute(job, images):
     if identity != job['job_id']:
         raise ValueError('Require canonical scanner job identity')
     profile = job.get('profile')
-    if profile not in ('tls', 'http', 'gitleaks'):
+    if profile not in ('tls', 'http', 'gitleaks', 'ports'):
         raise ValueError('Unsupported isolated profile')
     repository = profile == 'gitleaks' and 'repository_url' in job
     payload_field = ('repository_url' if repository else 'source_base64') if profile == 'gitleaks' else 'target'
@@ -72,14 +73,21 @@ def execute(job, images):
         result = {'findings': scanner_gitleaks.scan(images[profile], source)}
     else:
         target = job['target']
-        allowed = {'hostname', 'port', 'path'} if profile == 'http' else {'hostname', 'port'}
-        if not isinstance(target, dict) or not {'hostname', 'port'} <= set(target) or set(target) - allowed:
+        required = {'hostname', 'ports'} if profile == 'ports' else {'hostname', 'port'}
+        allowed = required | {'path'} if profile == 'http' else required
+        if not isinstance(target, dict) or not required <= set(target) or set(target) - allowed:
             raise ValueError('Invalid authorized scanner target')
-        addresses = resolve_target(target['hostname'], target['port'])
-        adapter = scanner_tlsx if profile == 'tls' else scanner_httpx
-        extra = {'path': target.get('path', '/')} if profile == 'http' else {}
-        # All resolved endpoints must complete. Never return partial success.
-        result = {'endpoints': [adapter.scan(images['guard'], images[profile],
-            target['hostname'], address, target['port'], **extra) for address in addresses]}
+        if profile == 'ports':
+            ports = scanner_naabu.validated_ports(target['ports'])
+            addresses = resolve_target(target['hostname'], ports[0])
+            result = {'endpoints': [scanner_naabu.scan(images['guard'], images[profile],
+                address, ports) for address in addresses]}
+        else:
+            addresses = resolve_target(target['hostname'], target['port'])
+            adapter = scanner_tlsx if profile == 'tls' else scanner_httpx
+            extra = {'path': target.get('path', '/')} if profile == 'http' else {}
+            # All resolved endpoints must complete. Never return partial success.
+            result = {'endpoints': [adapter.scan(images['guard'], images[profile],
+                target['hostname'], address, target['port'], **extra) for address in addresses]}
     return {'version': 1, 'job_id': identity, 'profile': profile,
             'observations_complete': True, 'result': result}

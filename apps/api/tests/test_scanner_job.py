@@ -76,3 +76,16 @@ def test_repository_job_chains_pinned_acquisition_and_offline_scan(dispatcher, m
     result = dispatcher.execute(envelope, images)
     assert result['observations_complete'] is True
     assert result['result'] == {'scope': 'repository_head', 'commit': 'a' * 40, 'findings': []}
+
+
+def test_ports_job_passes_only_explicit_ports(dispatcher, monkeypatch):
+    envelope = {'version': 1, 'job_id': str(uuid.uuid4()), 'profile': 'ports',
+                'target': {'hostname': 'authorized.example', 'ports': [443]}}
+    monkeypatch.setattr(dispatcher, 'resolve_target', lambda *args: ['1.1.1.1'])
+    def scan(guard, image, address, ports):
+        assert address == '1.1.1.1' and ports == [443]
+        return {'scope': 'tcp_connect_observation', 'open_ports': [443]}
+    monkeypatch.setattr(dispatcher.scanner_naabu, 'scan', scan)
+    images = {key: 'sha256:' + 'a' * 64 for key in ('guard', 'ports')}
+    result = dispatcher.execute(envelope, images)
+    assert result['observations_complete'] is True

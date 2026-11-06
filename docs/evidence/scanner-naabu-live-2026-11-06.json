@@ -1,0 +1,30 @@
+{
+  "verified_at": "2026-11-06T12:08:08.925830+00:00",
+  "tool": "naabu 2.6.1",
+  "release_sha256": "018c4c9884dea971eda860435ede3021d1150732f34cfd245498c6726d8cab90",
+  "image": "sha256:feb390d764b573e412b7d5153c42440cef073485c695950709b6b3595e5cb1f6",
+  "checks": {
+    "non_root_cap_drop_tcp_connect": true,
+    "owned_tcp_443_observed": true,
+    "all_resolved_endpoints_completed": true,
+    "receipt_replay": true
+  },
+  "scope": "Only own public backend TCP 443, trusted dispatcher and private temporary state. No broad port scan, proof of closed ports, app activation or reproducible image build claim",
+  "source_sha256": {
+    "deploy/scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "deploy/scanner_process.py": "a09372943bd8727bdf67b92979f5d6b0a879b3077c08a139fcd76ce535830768",
+    "deploy/scanner_archive.py": "476c4e7d1deeed55781446e282438576bd1484bd7f58e02bfd5cffcd40d2bd48",
+    "deploy/scanner_network.py": "e898b0513e0f7a8418ac120468cece1bc6340f76a0ed08f3d2a6829a7384ad0a",
+    "deploy/scanner_job_cli.py": "a4bd7124149301ed686d5fa1f59505abcdb7a825e4a792a213619330dbb90423",
+    "deploy/scanner_naabu.py": "3b4efa4af3d6c571fab9b7e7f05be4618f654a6a2b66c1194554f4bcd6b717ca",
+    "deploy/scanner_httpx.py": "1436ab1f219d6f45c1bfdcdcf5ce5402a702306098de0f70a8ad26fd796e9a39",
+    "deploy/scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2",
+    "deploy/scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "deploy/scanner_git.py": "aab525913124ba301ff79712f87efa03e1f128dcbbdb25660c331b86f6eca3b5",
+    "deploy/scanner_gitleaks.py": "6f8269e9e53e302c94e502291453c72daa13102abe584edbbdbf68183986a5d4",
+    "deploy/scanner_state.py": "06736a473d0595b33f738bbbaddf45045cec065dca45c3ad9d35ba3a268698be",
+    "deploy/scanner_offline.py": "0ecc270a6937633b2c63f6eec5c7663e1aff270211afc8017a83328bedccb4a0",
+    "deploy/scanner_job.py": "d9c1c62d7be8ff6821f8495fc1b7bad7ce07e1e273a0c877bbd6b813a3cce735",
+    "deploy/scanner_tlsx.py": "baa00d27ea42dc434cd2a790a25dae99e016c998915437c22802e0b3ae74004a"
+  }
+}

@@ -1,5 +1,16 @@
 # Sieťová fixture pre budúci scanner runner
 
+TCP connect profil `deploy/scanner_naabu.py` používa Naabu 2.6.1 výhradne
+v režime `-s c`, non-root, bez capabilities a host discovery. Povolených je
+1..64 explicitných portov; nft allowlist obsahuje presné IP/port páry.
+Nevolá nmap, pasívne API ani raw SYN/UDP scan. Výsledok obsahuje testované
+porty a pozorované otvorené porty ako info; neuvádza dôkaz zatvorených portov.
+Reálny job vlastného backendu na TCP 443 prešiel cez dispatcher a receipt
+replay. Release binárka potrebuje kompatibilný loader/libpcap: Alpine pokus
+zlyhal, Debian bookworm/libpcap image prešiel bez zvýšenia práv.
+[Dôkaz a presný image/checksum](evidence/scanner-naabu-live-2026-11-06.json).
+Nejde o široký port scan ani produkčnú aktiváciu profilu.
+
 Offline source handoff teraz prijíma iba nekomprimovaný tar do 4 MiB.
 `deploy/scanner_archive.py` validuje členov bez hostiteľskej extrakcie:
 odmieta traversal, absolútne/duplicitné cesty, odkazy a špeciálne súbory.
@@ -58,7 +69,7 @@ workeru. Retencia receipts, disk monitoring a riadená rekonciliácia zostávaj�
 potrebné pred produkčným zapojením. Všetky procesy musia používať ten istý stav.
 
 `deploy/scanner_job.py` poskytuje verzované dôveryhodné job rozhranie pre
-Gitleaks stdin, TLS a obmedzené HTTP pozorovanie. Identita je kanonické UUID,
+Gitleaks stdin/repository HEAD, TLS, obmedzené HTTP a TCP connect pozorovanie. Identita je kanonické UUID,
 job nesmie vyberať príkaz, image ani env. Images sú pevná konfigurácia operátora.
 Sieťový dispatch raz vyrieši DNS, odmietne akúkoľvek neverejnú odpoveď a
 vyžaduje úspech všetkých adries. Čiastočný výsledok neoznačí ako kompletný.
@@ -67,7 +78,7 @@ HTTP readiness vlastného backendu vrátil 200.
 [Dôkaz a presný rozsah](evidence/scanner-job-live-2026-11-06.json).
 Rozhranie samo nevykonáva tenantové oprávnenia, kvóty, autentifikovaný transport
 ani trvalú idempotenciu. Nie je verejná služba a nesmie sa tak vystaviť.
-Tieto integračné hranice a ďalších päť profilov zostávajú otvorené.
+Tieto integračné hranice a zostávajúce adaptéry zostávajú otvorené.
 
 HTTP pozorovanie `deploy/scanner_httpx.py` používa HTTPX 1.6.10, presnú verejnú
 IP/port, explicitné Host/SNI, HTTPS bez fallbacku a bez nasledovania redirectov.
