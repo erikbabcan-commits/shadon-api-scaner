@@ -1,0 +1,18 @@
+{
+  "verified_at": "2026-11-06T12:20:53.709574+00:00",
+  "release_commit": "77989e56e5e8e5febd4b7fc3587d2e5878c401e6",
+  "tool": "trivy 0.74.0",
+  "image": "sha256:113b1c51d8ae0b399c7ed02c59e6aef45ac0de3f4deddd99fb90aac1cc6536b7",
+  "database": {
+    "updated_at": "2026-11-06T09:50:00.021603+00:00",
+    "next_update": "2026-11-07T09:50:00.021602+00:00"
+  },
+  "analyzed_dependency_targets": 2,
+  "findings": [],
+  "scope": "Tracked release snapshot supported dependency files only; not production runtime, container OS packages, private dependencies or proof of vulnerability absence",
+  "dependency_files_sha256": {
+    "apps/api/pyproject.toml": "c5e322a84a5f721b32d0b904c6fdac50243e7a533fb96345afc8d58ae93cedc6",
+    "apps/api/uv.lock": "9e791d9d510ffa6ea34835c84e5f1acfa9b6d2d0515583c44737a5ecd0a36121",
+    "apps/web/package-lock.json": "f8db8547bad18067bdc02513d2fe3795a47fb2cdeadba8e63e97f74695e1247c"
+  }
+}
