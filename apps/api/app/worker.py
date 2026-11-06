@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 import shutil
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from arq import cron
 from arq.connections import RedisSettings
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
@@ -140,6 +141,7 @@ async def execute_scan_run(ctx, run_id: str) -> None:
         logger.info("Starting scan run %s (profile=%s, app=%s)", run_id, profile.value, app.name)
         await _set_run(db, rid, RunStatus.running)
         await db.commit()
+        started_at = run.started_at
 
         try:
             db.info["scan_run_id"] = rid
@@ -173,18 +175,40 @@ async def execute_scan_run(ctx, run_id: str) -> None:
             await db.commit()
             await _invalidate_overview_cache(settings, app.organization_id)
             logger.info("Scan run %s completed successfully (app=%s)", run_id, app.name)
+        except asyncio.CancelledError:
+            cleanup = asyncio.create_task(_fail_unfinished_run(db, rid, started_at, "Scanner execution cancelled"))
+            while True:
+                try:
+                    await asyncio.shield(cleanup)
+                    break
+                except asyncio.CancelledError:
+                    if cleanup.done():
+                        break
+                except Exception as exc:
+                    logger.error("Cancelled scan cleanup failed (error_type=%s)", type(exc).__name__)
+                    break
+            raise
         except Exception as exc:  # noqa: BLE001
-            logger.error("Scan run %s failed (error_type=%s)", run_id, type(exc).__name__)
-            await db.rollback()
-            async with SessionLocal() as db2:
-                await _set_run(db2, rid, RunStatus.failed, "Scanner execution failed")
-                await db2.commit()
+            logger.error("Scan run %s processing failed (error_type=%s)", run_id, type(exc).__name__)
+            await _fail_unfinished_run(db, rid, started_at, "Scanner execution failed")
         finally:
             if heavy and lock_token:
                 await redis.eval(
                     "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
                     1, settings.heavy_scan_lock_key, run_id,
                 )
+
+
+async def _fail_unfinished_run(db, run_id, started_at, message):
+    await db.rollback()
+    async with SessionLocal() as recovery:
+        # Never overwrite a committed result or another start of this run.
+        await recovery.execute(update(ScanRun).where(
+            ScanRun.id == run_id, ScanRun.status == RunStatus.running,
+            ScanRun.started_at == started_at,
+        ).values(status=RunStatus.failed, observations_complete=False,
+                 error=message, finished_at=datetime.now(timezone.utc)))
+        await recovery.commit()
 
 
 async def _heartbeat(db, app: App) -> None:
