@@ -41,6 +41,15 @@ Tento krok neaktivuje aplikačné CLI profily a nedokazuje bezpečnosť všetký
 závislostí nástrojov. Reprodukovateľný Git/Naabu/Trivy build, DB refresh,
 kapacitný monitoring a ďalšie integračné hranice zostávajú otvorené.
 
+Read-only operátorská kontrola:
+`python3 scripts/check_scanner_storage.py --path /var/lib/docker`.
+Vracia JSON a exit 0 iba pri zdravom priestore, 1 pri warning/critical a 2
+pri nedostupnom úložisku. Critical hranica je maximum 1 GiB a 5 % kapacity;
+warning maximum 2 GiB a 10 %. Nič nemaže a nečíta obsah súborov ani env.
+Lokálne boli overené zdravá/kritická fixture, reálne warning úložisko aj
+nedostupná cesta. Toto je pripravený gate, nie nainštalovaný monitoring alebo
+doručovanie alertov na VPS; tie stále vyžadujú prevádzkové zapojenie.
+
 ## Predchádzajúce adaptačné a izolačné dôkazy
 
 `trivy_fs` teraz používa kontrolovaný Git HEAD archív a nový offline Trivy
