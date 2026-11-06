@@ -15,9 +15,18 @@ identický s testovaným kandidátom `828c463`. CI kandidáta prešlo vrátane
 produkčného dependency auditu, 85 testov, TypeScriptu, buildu, PWA aj SSR gate.
 Normálny aj Lovable build majú 27 statických precache súborov; aktuálne robotové
 ikony ostali zachované. Text nepodložených scheduler intervalov bol odstránený.
-Lovable editor už načítal merge PR #3, ale hlási nepublikované zmeny.
-Toto nie je dôkaz novej verzie na publikovanej doméne ani fyzický iPhone test.
-[Dôkaz synchronizácie a CI](evidence/frontend-merged-readiness-2026-11-06.json).
+Po výslovnom schválení používateľom bolo vykonané Publish changes v Lovable;
+editor potvrdil „Your website was updated“. Živý Chrome zobrazil autentifikovaný
+dashboard, `og:type=website`, `twitter:card=summary` a bundle `index-Dbr2yTYB.js`
+zhodný názvom s testovaným Lovable buildom. Živý `/sw.js` sa po odstránení
+okrajových whitespace presne zhoduje s otestovaným `dist/client/sw.js`:
+SHA-256 `4be450a9d7317b7a3ee5d961a6f1935ef8a49af72b11fda56fb48d706ad12095`.
+Skutočný PWA parser potvrdil 27 precache položiek; validator overil 8 private
+a 4 navigačné NetworkOnly cesty. Toto nenahrádza fyzický iPhone ani browser
+offline/cache audit. Lovable nezobrazil nasadený Git SHA; prepojenie na build
+dokladá latest merge v editore, názov client bundle a presná zhoda workeru.
+[Historický dôkaz synchronizácie a CI](evidence/frontend-merged-readiness-2026-11-06.json),
+[nový dôkaz publikovania](evidence/frontend-publication-2026-11-06.json).
 
 Backend má opravený dnspython: minimum 2.9.0, lock 2.9.2 z verejného PyPI,
 bez zmien ostatných verzií. Upstream advisory GHSA-45c3-73f7-pv4m označuje
@@ -27,14 +36,19 @@ dependency targety bez nálezov v danej DB; nejde o dôkaz neprítomnosti všetk
 zraniteľností, OS balíkov kontajnera alebo produkčného runtime.
 [Dôkaz a hashe lockfiles](evidence/release-dependency-scan-2026-11-06.json).
 
-## Aktuálne natívne overenie 77989e5 a samostatný supervisor
+## Aktuálne natívne overenie a2b4006 a samostatný supervisor
 
-- **430 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
+- **435 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
   Python 3.12.13 a vlastnom Redis. Testovaný strom bol čistý; fingerprint teraz
   zahŕňa aj supervisor moduly a scanner verifikačné/build skripty.
-  [Dôkaz a presné hashe](evidence/backend-dnspython-matrix-2026-11-06.json).
+  [Dôkaz a presné hashe](evidence/backend-cancellation-matrix-2026-11-06.json).
   Rozsah zostáva SQLite API units + reálne PG/Redis/TLS/procesné/Git fixtures,
   nie všetky API scenáre na PostgreSQL.
+- Nových päť regresií overuje rollback čiastočných pozorovaní pri zrušení,
+  dokončenie cleanup aj po opakovanom cancel, zachovanie už commitnutého výsledku
+  pri zlyhaní cache alebo cancel a ochranu novšieho pokusu pred starým cleanup.
+  Pred opravou zlyhali dva pôvodné reproduktory. Nejde o ochranu pred SIGKILL,
+  pád hosta ani globálny execution lease; táto hranica zostáva otvorená.
 - Ruff F/E9, default Mypy pre 50 aplikačných súborov a secret scan sledovaného
   stromu prešli. Novší kontajnerový API/worker runtime po 8c78029 sa týmto
   natívnym behom nepotvrdzuje.
