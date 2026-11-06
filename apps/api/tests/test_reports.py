@@ -83,10 +83,17 @@ async def test_compliance_and_report_generation(
     assert comp_resp.status_code == 200
     comp_data = comp_resp.json()
     assert comp_data["app_name"] == "Audit Target App"
-    # 100 - 35 (crit) - 5 (med) = 60
-    assert comp_data["scoring"]["score"] == 60
-    assert comp_data["scoring"]["grade"] == "C"
+    # Stored findings are observations, not coverage or an overall security grade.
+    assert comp_data["scoring"]["score"] is None
+    assert comp_data["scoring"]["grade"] is None
+    assert comp_data["compliance_claimed"] is False
+    assert comp_data["coverage"] == "not_verified"
+    assert comp_data["scoring"]["open_counts"]["critical"] == 1
+    assert comp_data["scoring"]["open_counts"]["medium"] == 1
+    assert comp_data["scoring"]["open_counts"]["total"] == 2
+    assert comp_data["evidence_limits"]
     assert len(comp_data["nis2_readiness"]) == 4
+    assert all(area["compliance_claimed"] is False for area in comp_data["nis2_readiness"])
 
     # 2. Get HTML report
     html_resp = await client.get(
@@ -95,9 +102,62 @@ async def test_compliance_and_report_generation(
     )
     assert html_resp.status_code == 200
     assert "text/html" in html_resp.headers["content-type"]
-    assert "Executive Security Audit" in html_resp.text
+    assert "Technický bezpečnostný prehľad" in html_resp.text
+    assert "Zhoda neposúdená" in html_resp.text
+    assert "posúdenie zhody NIS2" not in html_resp.text
+    assert "Celkový bezpečnostný index" not in html_resp.text
     assert "SQL Injection Vulnerability" in html_resp.text
     assert "report-sha256" in html_resp.text
+
+
+@pytest.mark.parametrize("last_up", [None, True, False])
+def test_empty_findings_and_heartbeat_never_produce_security_grade(last_up):
+    from app.services.compliance import calculate_security_score, evaluate_nis2_areas
+
+    app = App(last_up=last_up)
+    scoring = calculate_security_score([], app)
+    assert scoring["score"] is None and scoring["grade"] is None
+    assert scoring["open_counts"]["total"] == 0
+    assert scoring["status"] == "not_assessed"
+    areas = evaluate_nis2_areas([], app)
+    assert all(area["status"] not in ("COMPLIANT", "NON-COMPLIANT") for area in areas)
+    assert all(area["compliance_claimed"] is False for area in areas)
+    assert areas[-1]["issues_count"] == int(last_up is False)
+    if last_up is not None:
+        assert "bodové pozorovanie" in areas[-1]["evidence_note"]
+
+
+def test_resolved_findings_do_not_create_perfect_score_or_open_observations():
+    from app.services.compliance import calculate_security_score, evaluate_nis2_areas
+
+    finding = Finding(
+        source=FindingSource.tls,
+        severity=FindingSeverity.critical,
+        title="TLS certificate expired",
+        status=FindingStatus.fixed,
+    )
+    scoring = calculate_security_score([finding], App(last_up=True))
+    assert scoring["score"] is None and scoring["grade"] is None
+    assert scoring["open_counts"]["total"] == 0
+    assert all(area["issues_count"] == 0 for area in evaluate_nis2_areas([finding]))
+
+
+def test_white_label_report_cannot_hide_evidence_limits_or_claim_empty_scan_success():
+    from app.services.reporting import generate_html_report
+
+    app = App(id=uuid.uuid4(), name="Unscanned <application>", base_url="https://example.invalid", environment="prod", last_up=True)
+    org = Organization(id=uuid.uuid4(), name="Custom org", plan_tier="pro", report_footer_text="Custom agency footer")
+    report = generate_html_report(app, org, [])
+    assert "Custom agency footer" in report
+    assert "Zhoda neposúdená" in report
+    assert "Tento prehľad neposudzuje zhodu s NIS2 alebo ISO 27001" in report
+    assert "Technický report nie je certifikáciou ani právnym posúdením zhody." in report
+    assert "Neznamená to, že kontroly prebehli" in report
+    assert "Unscanned &lt;application&gt;" in report
+    assert "A+" not in report
+    assert "100 %" not in report
+    assert "NON-COMPLIANT" not in report and "COMPLIANT" not in report
+    assert "Hash metadát reportu (nie podpis ani hash celého obsahu)" in report
 
 
 @pytest.mark.asyncio

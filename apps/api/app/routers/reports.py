@@ -79,7 +79,9 @@ async def get_app_compliance(
 
     return {
         "assessment_type": "technical_indicators_not_legal_certification",
+        "compliance_claimed": False,
         "coverage": "not_verified",
+        "evidence_limits": scoring["evidence_limits"],
         "app_id": app.id,
         "app_name": app.name,
         "base_url": app.base_url,

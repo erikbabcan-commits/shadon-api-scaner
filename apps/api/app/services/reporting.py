@@ -54,7 +54,7 @@ def generate_html_report(
     footer_text = (
         org.report_footer_text
         if (is_white_label and org.report_footer_text)
-        else "Vygenerované bezpečnostnou platformou Stráž Security Intelligence • Technický report nie je certifikáciou ani právnym posúdením zhody."
+        else "Vygenerované platformou Stráž Security Intelligence."
     )
 
     scoring = calculate_security_score(findings, app)
@@ -72,6 +72,10 @@ def generate_html_report(
         "generated_at": generated_at.isoformat(),
         "score": scoring["score"],
         "grade": scoring["grade"],
+        "assessment_status": scoring["status"],
+        "coverage": scoring["coverage"],
+        "compliance_claimed": False,
+        "hash_scope": "report_metadata_only",
         "total_open_findings": scoring["open_counts"]["total"],
     }
     manifest_json = json.dumps(manifest_data, sort_keys=True, separators=(",", ":"))
@@ -119,15 +123,16 @@ def generate_html_report(
     # Build NIS2 rows
     nis2_rows = []
     for area in nis2_areas:
-        status_color = "#10b981" if area["status"] == "COMPLIANT" else ("#f59e0b" if area["status"] == "WARNING" else "#ef4444")
+        status_color = "#b45309" if area["issues_count"] else "#64748b"
+        status_label = "Technické pozorovania" if area["issues_count"] else "Neposúdené"
         nis2_rows.append(
             f"""
             <tr style="border-bottom:1px solid #e2e8f0;">
-                <td style="padding:10px;font-weight:600;font-size:13px;color:#1e293b;">{html.escape(area['name'])}</td>
+                <td style="padding:10px;font-weight:600;font-size:13px;color:#1e293b;">{html.escape(area['name'])}<div style="font-size:11px;font-weight:400;">{html.escape(area['evidence_note'])}</div></td>
                 <td style="padding:10px;font-size:12px;color:#64748b;">{html.escape(area['iso_ref'])}</td>
                 <td style="padding:10px;text-align:right;">
                     <span style="background:{status_color};color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;">
-                        {area['status']}
+                        {status_label}
                     </span>
                 </td>
             </tr>
@@ -151,7 +156,7 @@ def generate_html_report(
 <html lang="sk">
 <head>
     <meta charset="utf-8">
-    <title>Executive Security Audit — {html.escape(app.name)}</title>
+    <title>Technický bezpečnostný prehľad — {html.escape(app.name)}</title>
     <meta name="report-sha256" content="{sha256_hash}">
     <style>
         @page {{
@@ -229,12 +234,12 @@ def generate_html_report(
     <div class="header-bar">
         <div>
             {f'<img src="{html.escape(logo_url)}" style="max-height:40px;margin-bottom:6px;" alt="Logo"/>' if logo_url else f'<h1 style="margin:0;font-size:24px;color:{brand_color};font-weight:800;">STRÁŽ INTELLIGENCE</h1>'}
-            <div style="font-size:12px;color:#64748b;">Bezpečnostný audit a posúdenie zhody NIS2 / ISO 27001</div>
+            <div style="font-size:12px;color:#64748b;">Prehľad uložených technických pozorovaní</div>
         </div>
         <div style="text-align:right;font-size:11px;color:#64748b;">
-            <div><strong>Audit ID:</strong> {report_id[:8]}</div>
+            <div><strong>Report ID:</strong> {report_id[:8]}</div>
             <div><strong>Dátum:</strong> {generated_at.strftime('%d.%m.%Y %H:%M UTC')}</div>
-            <div><strong>SHA-256:</strong> {sha256_hash[:16]}…</div>
+            <div><strong>SHA-256 metadát:</strong> {sha256_hash[:16]}…</div>
         </div>
     </div>
 
@@ -246,15 +251,13 @@ def generate_html_report(
     </div>
 
     <div class="score-box">
-        <div class="grade-badge">{scoring['grade']}</div>
+        <div class="grade-badge">—</div>
         <div style="flex:1;">
             <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                <span style="font-size:18px;font-weight:700;">Celkový bezpečnostný index: {scoring['score']} %</span>
+                <span style="font-size:18px;font-weight:700;">Celkové bezpečnostné skóre nie je určené</span>
                 <span style="font-size:13px;color:#64748b;">{scoring['open_counts']['total']} otvorených nálezov</span>
             </div>
-            <div style="background:#e2e8f0;height:10px;border-radius:5px;overflow:hidden;">
-                <div style="background:{scoring['color']};height:100%;width:{scoring['score']}%;"></div>
-            </div>
+            <div style="font-size:13px;color:#475569;">Zhoda neposúdená. Úplnosť a aktuálnosť kontrol nie sú overené.</div>
             <div style="font-size:12px;color:#64748b;margin-top:8px;">
                 Kritické: <strong style="color:#ef4444;">{scoring['open_counts']['critical']}</strong> • 
                 Vysoké: <strong style="color:#f97316;">{scoring['open_counts']['high']}</strong> • 
@@ -264,26 +267,31 @@ def generate_html_report(
         </div>
     </div>
 
-    <h2>1. Vyhodnotenie súladu s európskou smernicou NIS2 (Článok 21)</h2>
+    <div style="border:1px solid #cbd5e1;padding:12px;border-radius:8px;font-size:12px;">
+        <strong>Rozsah a obmedzenia dôkazov</strong>
+        <ul>{''.join('<li>' + html.escape(limit) + '</li>' for limit in scoring['evidence_limits'])}</ul>
+    </div>
+
+    <h2>1. Technické pozorovania podľa oblastí</h2>
     <table>
         <tbody>
             {''.join(nis2_rows)}
         </tbody>
     </table>
 
-    {f'''<h2>2. Mapovanie bezpečnostných zlyhaní na OWASP Top 10</h2>
+    {f'''<h2>2. Orientačné zaradenie nálezov podľa OWASP Top 10</h2>
     <table>
         <tbody>
             {''.join(owasp_rows)}
         </tbody>
     </table>''' if owasp_rows else ''}
 
-    <h2>3. Detail technických zraniteľností a odporúčané nápravy</h2>
-    {''.join(findings_rows) if findings_rows else '<p style="color:#10b981;font-weight:600;font-size:14px;">Neboli zistené žiadne aktívne zraniteľnosti. Výsledok nepreukazuje úplnosť pokrytia ani právny súlad.</p>'}
+    <h2>3. Evidované technické nálezy</h2>
+    {''.join(findings_rows) if findings_rows else '<p style="color:#475569;font-size:14px;">V uložených údajoch nie sú žiadne nálezy. Neznamená to, že kontroly prebehli alebo že aplikácia nemá zraniteľnosti.</p>'}
 
     <div class="footer">
-        <div>{html.escape(footer_text)}</div>
-        <div>Overovací hash záznamu: {sha256_hash}</div>
+        <div>{html.escape(footer_text)}<br>Technický report nie je certifikáciou ani právnym posúdením zhody.</div>
+        <div>Hash metadát reportu (nie podpis ani hash celého obsahu): {sha256_hash}</div>
     </div>
 
 

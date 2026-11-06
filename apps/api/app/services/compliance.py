@@ -6,87 +6,42 @@ from typing import Any
 from app.models import App, Finding, FindingSeverity, FindingStatus
 
 
+EVIDENCE_LIMITS = (
+    "Počty nálezov opisujú iba uložené technické pozorovania; nulový počet nepreukazuje bezpečnosť.",
+    "Úplnosť, aktuálnosť a úspešné vykonanie všetkých potrebných kontrol nie sú overené.",
+    "Dostupnosť URL v jednom okamihu nepreukazuje kontinuitu, pripravenosť na incidenty ani účinnosť procesov.",
+    "Tento prehľad neposudzuje zhodu s NIS2 alebo ISO 27001 a nie je certifikáciou.",
+)
+
+
 def calculate_security_score(findings: list[Finding], app: App | None = None) -> dict[str, Any]:
-    score = 100
-    forced_f = False
+    """Return observations without inventing an overall security grade.
+
+    Persisted findings and the latest heartbeat do not establish scan coverage,
+    freshness, or organizational controls. Keep the legacy score/grade keys
+    nullable so callers can distinguish missing assessment from a perfect score.
+    """
     open_findings = [f for f in findings if f.status == FindingStatus.open]
-
-    crit_count = 0
-    high_count = 0
-    med_count = 0
-    low_count = 0
-    info_count = 0
-    expiry_penalty = 0
-
-    for f in open_findings:
-        title_lower = (f.title or "").lower()
-        detail_lower = (f.detail or "").lower()
-
-        # Check for expired SSL or expired domain
-        if "expired" in title_lower or "expired" in detail_lower:
-            forced_f = True
-
-        # Check for expiry within 21 days
-        if "expir" in title_lower or "expir" in detail_lower:
-            expiry_penalty += 10
-
-        if f.severity == FindingSeverity.critical:
-            crit_count += 1
-            score -= 35
-        elif f.severity == FindingSeverity.high:
-            high_count += 1
-            score -= 15
-        elif f.severity == FindingSeverity.medium:
-            med_count += 1
-            score -= 5
-        elif f.severity == FindingSeverity.low:
-            low_count += 1
-        elif f.severity == FindingSeverity.info:
-            info_count += 1
-
-    score -= expiry_penalty
-
-    # Check if app is down
-    if app and app.last_up is False:
-        forced_f = True
-
-    if forced_f:
-        score = min(score, 39)
-
-    score = max(0, min(100, score))
-
-    if score >= 95:
-        grade = "A+"
-        color = "#10b981" # Emerald
-    elif score >= 85:
-        grade = "A"
-        color = "#22c55e" # Green
-    elif score >= 75:
-        grade = "B"
-        color = "#0ea5e9" # Sky
-    elif score >= 60:
-        grade = "C"
-        color = "#eab308" # Yellow
-    elif score >= 40:
-        grade = "D"
-        color = "#f97316" # Orange
-    else:
-        grade = "F"
-        color = "#ef4444" # Red
+    counts = {
+        severity.value: sum(f.severity == severity for f in open_findings)
+        for severity in FindingSeverity
+    }
+    counts["total"] = len(open_findings)
+    availability = "unknown"
+    if app is not None and app.last_up is not None:
+        availability = "reachable" if app.last_up else "unreachable"
 
     return {
-        "score": score,
-        "grade": grade,
-        "color": color,
-        "forced_f": forced_f,
-        "open_counts": {
-            "critical": crit_count,
-            "high": high_count,
-            "medium": med_count,
-            "low": low_count,
-            "info": info_count,
-            "total": len(open_findings),
-        },
+        "score": None,
+        "grade": None,
+        "color": "#64748b",
+        "forced_f": False,
+        "status": "not_assessed",
+        "coverage": "not_verified",
+        "compliance_claimed": False,
+        "open_counts": counts,
+        "availability_observation": availability,
+        "evidence_limits": list(EVIDENCE_LIMITS),
     }
 
 
@@ -125,59 +80,66 @@ def map_owasp_top_10(findings: list[Finding]) -> dict[str, int]:
 
 
 def evaluate_nis2_areas(findings: list[Finding], app: App | None = None) -> list[dict[str, Any]]:
+    """Group technical observations by topic; never infer legal compliance.
+
+    The legacy endpoint/field names are retained for API compatibility. Keyword
+    mapping is only a navigation aid, not evidence that a control was assessed.
+    """
     open_findings = [f for f in findings if f.status == FindingStatus.open]
+    topics = (
+        (
+            "nis2_net_crypto",
+            "Sieťové a kryptografické pozorovania",
+            ("tls", "ssl", "certificate", "rdap", "dns", "crypto", "https"),
+        ),
+        (
+            "nis2_vuln_mgmt",
+            "Pozorovania zraniteľností a expozícií",
+            ("nuclei", "port", "internetdb", "shodan", "injection", "xss"),
+        ),
+        (
+            "nis2_supply_chain",
+            "Pozorovania dodávateľského reťazca a kódu",
+            ("trivy", "cve", "gitleaks", "secret", "sast", "package"),
+        ),
+    )
+    areas = []
+    for area_id, name, keywords in topics:
+        related = [
+            finding for finding in open_findings
+            if any(word in (
+                f"{finding.title or ''} {finding.detail or ''} "
+                f"{getattr(finding.source, 'value', finding.source)}"
+            ).lower() for word in keywords)
+        ]
+        areas.append({
+            "id": area_id,
+            "name": name,
+            "iso_ref": "NIS2 / ISO 27001: orientačná tematická súvislosť",
+            "status": "OBSERVATIONS_PRESENT" if related else "NOT_ASSESSED",
+            "issues_count": len(related),
+            "compliance_claimed": False,
+            "evidence_note": (
+                "Orientačné zaradenie uložených otvorených nálezov podľa textu a zdroja; "
+                "nejde o posúdenie požiadaviek ani úplnosti kontrol."
+            ),
+        })
 
-    # Area 1: Network & Cryptographic Security
-    area1_findings = [
-        f for f in open_findings
-        if any(w in (f.title or "").lower() for w in ["tls", "ssl", "certificate", "rdap", "dns"])
-    ]
-    area1_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area1_findings) else ("WARNING" if area1_findings else "WARNING")
-
-    # Area 2: Vulnerability Management
-    area2_findings = [
-        f for f in open_findings
-        if any(w in (f.title or "").lower() for w in ["nuclei", "port", "internetdb", "shodan"])
-    ]
-    area2_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area2_findings) else ("WARNING" if area2_findings else "WARNING")
-
-    # Area 3: Supply Chain Security
-    area3_findings = [
-        f for f in open_findings
-        if any(w in (f.title or "").lower() for w in ["trivy", "cve", "gitleaks", "secret", "sast"])
-    ]
-    area3_status = "NON-COMPLIANT" if any(f.severity in (FindingSeverity.critical, FindingSeverity.high) for f in area3_findings) else ("WARNING" if area3_findings else "WARNING")
-
-    # Area 4: Availability & Incident Monitoring
-    area4_status = "NON-COMPLIANT" if (app and app.last_up is False) else ("COMPLIANT" if app and app.last_up is True else "WARNING")
-
-    return [
-        {
-            "id": "nis2_net_crypto",
-            "name": "Sieťová a kryptografická bezpečnosť (Článok 21 ods. 2 písm. a)",
-            "iso_ref": "ISO/IEC 27001:2022 A.8.20, A.8.24",
-            "status": area1_status,
-            "issues_count": len(area1_findings),
-        },
-        {
-            "id": "nis2_vuln_mgmt",
-            "name": "Riadenie zraniteľností a expozícií (Článok 21 ods. 2 písm. e)",
-            "iso_ref": "ISO/IEC 27001:2022 A.8.8",
-            "status": area2_status,
-            "issues_count": len(area2_findings),
-        },
-        {
-            "id": "nis2_supply_chain",
-            "name": "Bezpečnosť dodávateľského reťazca a kódu (Článok 21 ods. 2 písm. d)",
-            "iso_ref": "ISO/IEC 27001:2022 A.5.19, A.8.28",
-            "status": area3_status,
-            "issues_count": len(area3_findings),
-        },
-        {
-            "id": "nis2_availability",
-            "name": "Kontinuita činností a incident monitoring (Článok 21 ods. 2 písm. c)",
-            "iso_ref": "ISO/IEC 27001:2022 A.8.16, A.8.26",
-            "status": area4_status,
-            "issues_count": 0 if area4_status == "COMPLIANT" else 1,
-        },
-    ]
+    unavailable = app is not None and app.last_up is False
+    availability_note = "Nie je uložené pozorovanie dostupnosti."
+    if app is not None and app.last_up is not None:
+        availability_note = (
+            "Posledné bodové pozorovanie URL: "
+            + ("dostupná." if app.last_up else "nedostupná.")
+            + " Neoveruje kontinuitu, incidentné procesy ani aktuálny stav služby."
+        )
+    areas.append({
+        "id": "nis2_availability",
+        "name": "Bodové pozorovanie dostupnosti",
+        "iso_ref": "NIS2 / ISO 27001: orientačná tematická súvislosť",
+        "status": "OBSERVATIONS_PRESENT" if unavailable else "NOT_ASSESSED",
+        "issues_count": int(unavailable),
+        "compliance_claimed": False,
+        "evidence_note": availability_note,
+    })
+    return areas
