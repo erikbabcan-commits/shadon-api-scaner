@@ -26,6 +26,14 @@ nie sú potvrdené produkčným deploymentom.
   rozpracované release podklady. Kandidát `3777a37` má rovnaký runtime kód ako
   `318845a`, ktorý mení len zápis logov testovacieho runnera.
 - Legacy frontend na Node 22: **22/22**, TypeScript a build úspešné.
+- Primárny frontend má [otvorený PR #3](https://github.com/youh4ck3dme/straz-security-beacon/pull/3),
+  HEAD `62db740`: reporty bez nepodloženého skóre a opravený PWA client output.
+  **77/77**, TypeScript a oba reálne buildy (`.output/public` aj Lovable `dist/client`)
+  prešli. Oba generujú **23 statických precache položiek** vrátane offline stránky;
+  generovaný worker overuje NetworkOnly pre API/health, reporty/CSV a HTML navigácie.
+  [Nové CI presného SHA](https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42202424387)
+  je **SUCCESS** vrátane post-build SW validátora. [Sanitizovaný dôkaz](evidence/frontend-quality-2026-11-06.json).
+  PR ešte nie je zlúčený/publikovaný; tento výsledok nenahrádza fyzický iPhone test.
 - Všetky tri nové image z čistého exportu `3777a37` boli úspešne zostavené pre
   Linux AMD64; [presné image ID a Dockerfile hashe](evidence/container-builds-quality-2026-11-06.json).
   [Nový runtime tok prešiel 28/28](evidence/container-runtime-quality-2026-11-06.json):
@@ -289,6 +297,11 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
   opäť skončil billing blokom: secret gate mal nula vykonaných krokov a backend/frontend
   boli preskočené. CodeRabbit review `APPROVED` nie je náhrada testov. Používateľ
   odložil riešenie GitHub billing; nevykonal sa platený zásah ani obídenie gates.
+- [CI na `83227ba`](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/runs/42202345390)
+  potvrdilo rovnaký billing blok aj po nových runtime opravách: secret gate
+  `127840446397` má nula krokov, backend/frontend sú skipped. Nie je to
+  zlyhanie vykonaného testu ani zelené backendové CI. Tento výsledok je viazaný
+  na uvedený SHA; neskoršie dokumentačné commity nemenia otestovaný runtime.
 - Oprávnený prístup do Railway dashboardu aj CLI funguje. Čerstvé `whoami/status`
   potvrdili workspace H4CK3D's Projects, projekt
   `dev-new`, environment `production` a štyri online služby (API, worker,
