@@ -5,6 +5,7 @@ import hmac
 import json
 import time
 import base64
+import uuid
 from typing import Any
 
 from app.models import AlertChannel
@@ -116,9 +117,14 @@ def format_webhook(
     title: str,
     detail: str | None,
     app_name: str | None,
+    *,
+    event_id: uuid.UUID | None = None,
 ) -> tuple[dict[str, Any], dict[str, str]]:
+    # Identify an event, not the channel: multiple alerts to one channel are
+    # distinct, while retries of an outbox event retain the same identifier.
+    identifier = str(event_id or uuid.uuid4())
     payload = {
-        "event_id": str(channel.id),
+        "event_id": identifier,
         "event_type": event_type,
         "severity": severity,
         "title": title,
@@ -126,7 +132,7 @@ def format_webhook(
         "app_name": app_name,
         "timestamp": int(time.time()),
     }
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "Idempotency-Key": identifier}
     if channel.secret_token:
         body_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         signature = hmac.new(

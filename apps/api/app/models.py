@@ -269,6 +269,10 @@ class AlertChannel(Base):
 
 class AlertEvent(Base):
     __tablename__ = "alert_events"
+    __table_args__ = (
+        Index("ix_alert_events_status_next_attempt", "status", "next_attempt_at"),
+        Index("ix_alert_events_status_lease_expiry", "status", "lease_expires_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(
@@ -287,6 +291,10 @@ class AlertEvent(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_token: Mapped[uuid.UUID | None] = mapped_column(GUID, nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class App(Base):

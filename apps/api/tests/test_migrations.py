@@ -42,7 +42,7 @@ def test_sqlite_upgrade_preserves_data_and_downgrade(tmp_path):
     with sqlite3.connect(database_path) as connection:
         connection.execute("PRAGMA foreign_keys=ON")
         assert connection.execute("SELECT version_num FROM alembic_version").fetchone() == (
-            "009_cvss_and_poc_fields",
+            "010_alert_outbox_leases",
         )
         assert connection.execute("SELECT name, organization_id FROM apps").fetchone() == (
             "Legacy app", None,
