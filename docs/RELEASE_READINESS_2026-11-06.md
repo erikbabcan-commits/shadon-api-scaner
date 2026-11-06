@@ -137,8 +137,15 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
   `production`, `straz_cookie_secure=true` a `straz_cookie_samesite=none`.
   Toto nie je overenie skutočnej prihlasovacej cookie. Interpreter aplikácie je
   `/opt/venv/bin/python`; systémový Python nemá aplikačné závislosti.
-  Presné runtime SHA workera, Alembic head,
-  ďalšie runtime nastavenia a prevádzkové dôkazy ešte neboli získané.
+  Následný výstup Railway konzoly dodaný používateľom potvrdil PostgreSQL
+  **18.6 (Debian)** a revíziu **008_postgres_uuid_and_audit_fk**. Release zdroje
+  obsahujú aj revíziu 009; produkčný upgrade sa počas kontroly nevykonal.
+  Premenná `STRAZ_TRUSTED_PROXY_IPS` podľa tohto výstupu nie je nastavená.
+  Skoršia kontrola neexistujúceho atribútu `straz_trusted_proxy_cidrs` sama
+  o sebe nebola dôkazom proxy trust konfigurácie. Allowlist treba odvodiť
+  od skutočného ingressu a overiť, nie nastaviť slepo na všetky adresy.
+  Presné runtime SHA workera, ďalšie nastavenia a prevádzkové dôkazy zostávajú
+  nezískané.
 
 ## Podmienky pred uzavretím release
 
@@ -147,9 +154,10 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
    a získať nový overený commit s aktuálnymi CI výsledkami vrátane PostgreSQL 16/18.
 2. Doplniť overenie produkčného prihlásenia/cookies v prehliadači a na iPhone.
    Publikovanie Lovable a verejné API prepojenie sú overené vyššie.
-3. Cez obnovený Railway dashboard prístup potvrdiť presné runtime SHA/pin,
-   Alembic head, worker a produkčný režim/HSTS; následne overiť nasadenie
-   aktuálnych backendových opráv. Stav CLI prihlásenia zostáva nevyriešený.
+3. Cez obnovený Railway dashboard prístup overiť worker, ingress trust boundary,
+   HSTS a bezpečný upgrade potvrdenej revízie 008 na aktuálny head 009;
+   následne overiť nasadenie aktuálnych backendových opráv. Stav CLI prihlásenia
+   zostáva nevyriešený.
 4. Doložiť stav rotácie historicky kompromitovaných tajomstiev, čerstvú súkromnú
    zálohu a izolovaný restore, alerty a proxy/limiter trust boundary podľa
    [prevádzkového postupu](OPERATIONS_ACCEPTANCE.md) a
