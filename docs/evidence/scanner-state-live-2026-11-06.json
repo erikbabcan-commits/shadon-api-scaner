@@ -1,0 +1,26 @@
+{
+  "verified_at": "2026-11-06T11:54:32.915892+00:00",
+  "checks": {
+    "real_cli_to_container": true,
+    "durable_receipt_replay": true,
+    "source_not_persisted": true,
+    "job_identity_preserved": true,
+    "duplicate_json_rejected": true,
+    "failure_contains_no_raw_diagnostic": true
+  },
+  "scope": "Real one-shot subprocess with private temporary state; repeated request returns identical cached response without receipt rewrite; crash reconciliation and app queue integration remain outside live proof",
+  "source_sha256": {
+    "deploy/scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "deploy/scanner_process.py": "6bf3caeccc871834275c5e02249a3a19e80943991754bc00c75b9963ed9c223b",
+    "deploy/scanner_network.py": "e898b0513e0f7a8418ac120468cece1bc6340f76a0ed08f3d2a6829a7384ad0a",
+    "deploy/scanner_job_cli.py": "a4bd7124149301ed686d5fa1f59505abcdb7a825e4a792a213619330dbb90423",
+    "deploy/scanner_httpx.py": "1436ab1f219d6f45c1bfdcdcf5ce5402a702306098de0f70a8ad26fd796e9a39",
+    "deploy/scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2",
+    "deploy/scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "deploy/scanner_gitleaks.py": "155ff3264a0f226f7db106cf32e894d97dfe87e494556ada958171d51baa2fba",
+    "deploy/scanner_state.py": "06736a473d0595b33f738bbbaddf45045cec065dca45c3ad9d35ba3a268698be",
+    "deploy/scanner_offline.py": "7d6feef2e2889b3577cf636dfa494559f5023be599e9ed65fb60ee88f729a971",
+    "deploy/scanner_job.py": "7a9742df9f93f832b5b1ee81d4fad2af242a6a7aa86443d16defdaafb42b6e47",
+    "deploy/scanner_tlsx.py": "baa00d27ea42dc434cd2a790a25dae99e016c998915437c22802e0b3ae74004a"
+  }
+}

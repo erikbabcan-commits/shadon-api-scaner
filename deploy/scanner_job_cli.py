@@ -10,6 +10,7 @@ import signal
 import sys
 
 from scanner_job import execute
+from scanner_state import execute_once
 
 MAX_REQUEST = 2 * 1024 * 1024
 FAILURE = {'version': 1, 'observations_complete': False, 'error': 'scanner_job_failed'}
@@ -24,13 +25,13 @@ def unique_object(pairs):
     return result
 
 
-def serve(input_stream, output_stream, images):
+def serve(input_stream, output_stream, images, executor=None):
     try:
         raw = input_stream.read(MAX_REQUEST + 1)
         if len(raw) > MAX_REQUEST:
             raise ValueError('Scanner request exceeds limit')
         job = json.loads(raw, object_pairs_hook=unique_object)
-        result = execute(job, images)
+        result = (executor or execute)(job, images)
         encoded = json.dumps(result, separators=(',', ':')).encode()
         if len(encoded) > 4 * 1024 * 1024:
             raise RuntimeError('Scanner response exceeds limit')
@@ -52,6 +53,7 @@ def interrupted(signum, frame):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--images-file', type=Path, required=True)
+    parser.add_argument('--state-dir', type=Path, required=True)
     args = parser.parse_args()
     for name in ('SIGTERM', 'SIGINT', 'SIGHUP', 'SIGALRM'):
         signal.signal(getattr(signal, name), interrupted)
@@ -62,7 +64,8 @@ def main():
         if len(raw) > 65536:
             raise ValueError('Invalid operator image configuration')
         images = json.loads(raw, object_pairs_hook=unique_object)
-        return serve(sys.stdin.buffer, sys.stdout.buffer, images)
+        return serve(sys.stdin.buffer, sys.stdout.buffer, images,
+                     lambda job, config: execute_once(job, config, args.state_dir))
     except Exception:
         sys.stdout.buffer.write(json.dumps(FAILURE).encode() + b'\n')
         return 1

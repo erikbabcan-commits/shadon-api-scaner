@@ -1,7 +1,7 @@
 # Sieťová fixture pre budúci scanner runner
 
 Jednorazové rozhranie supervisora:
-`python3 deploy/scanner_job_cli.py --images-file <operátorom-spravované-images.json>`.
+`python3 deploy/scanner_job_cli.py --images-file <operátorom-spravované-images.json> --state-dir <súkromný-spoločný-stav>`.
 Prijme jeden JSON zo stdin (max 2 MiB), odmietne duplicitné polia a vypíše
 jeden JSON do stdout. Konfigurácia obsahuje iba nemenné lokálne image IDs.
 Chyba vracia generický `scanner_job_failed`, nie tool stderr alebo zdrojové
@@ -9,8 +9,20 @@ dáta. Pracovný alarm je 300 s; cleanup môže pokračovať po tomto limite.
 Bežné SIGTERM/INT/HUP rozbalia finally bloky, SIGKILL/crash recovery tým
 nie sú vyriešené. Reálny nový subprocess → izolovaný kontajner prešiel.
 [Dôkaz](evidence/scanner-cli-live-2026-11-06.json).
-CLI neotvára port. Autentifikovaný súkromný transport, admission a idempotencia
-musí vzniknúť pred jeho produkčným zapojením; žiadny daemon nebol nasadený.
+CLI neotvára port. Autentifikovaný súkromný transport a tenant admission
+musia vzniknúť pred produkčným zapojením; žiadny daemon nebol nasadený.
+
+`deploy/scanner_state.py` serializuje supervisor procesy cez OS flock v jednom
+spoločnom súkromnom adresári. Durable running receipt vznikne pred spustením,
+úspešný výsledok sa uloží atomicky s fsync a opakovaná rovnaká úloha sa
+nevykoná znova. Hash zahŕňa vstup aj image konfiguráciu; raw source sa neukladá.
+Rovnaké ID s iným vstupom/images sa odmietne. Running/failed receipt alebo
+osirelé scanner kontajnery vyžadujú kontrolu operátora, nie automatický replay.
+Reálny CLI replay na VPS prešiel so zhodnou odpoveďou bez prepisu receipt.
+[Dôkaz](evidence/scanner-state-live-2026-11-06.json).
+Nie je to automatická crash recovery ani globálny lease existujúceho ARQ
+workeru. Retencia receipts, disk monitoring a riadená rekonciliácia zostávajú
+potrebné pred produkčným zapojením. Všetky procesy musia používať ten istý stav.
 
 `deploy/scanner_job.py` poskytuje verzované dôveryhodné job rozhranie pre
 Gitleaks stdin, TLS a obmedzené HTTP pozorovanie. Identita je kanonické UUID,
