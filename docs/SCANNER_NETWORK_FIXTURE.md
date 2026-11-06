@@ -9,6 +9,18 @@ overil cleanup a zachovanie pôvodných bežiacich kontajnerov.
 [Dôkaz a hashe zdrojov](evidence/scanner-network-live-2026-11-06.json).
 Tento test nespúšťal externý scan a neaktivuje aplikačné profily.
 
+`deploy/scanner_tlsx.py` je prvý konkrétny sieťový adaptér: jedno autorizované
+DNS meno, pripnutá verejná IP/port, explicitné SNI, zakázané update checks,
+jedna paralelná úloha a limitovaný timeout. Reálny probe vlastného backendu
+prešiel v izolovanom kontajneri s oficiálnym tlsx 1.1.9 overeným SHA-256.
+Porovnanie názvu používa DNS SAN certifikátu a autorizovaný hostname, pretože
+tool pri IP vstupe môže hlásiť mismatch voči IP aj s nastaveným SNI.
+Podporovaný je presný DNS názov a celý ľavý wildcard label pre jednu úroveň.
+Neplatný report alebo neúspešný probe neznamená čistý výsledok.
+[Dôkaz a rozsah](evidence/scanner-tlsx-live-2026-11-06.json).
+Ide o expiráciu, DNS meno a self-signed pozorovania; nie úplné overenie trust
+chain/revokácie a zatiaľ ani aktivovaný aplikačný profil.
+
 Offline procesná vrstva je v `deploy/scanner_process.py` a
 `deploy/scanner_offline.py`: vstup najviac 1 MiB, spoločný limit stdout/stderr,
 deadline aj pri zdedených alebo zavretých rúrach, ukončenie procesnej skupiny

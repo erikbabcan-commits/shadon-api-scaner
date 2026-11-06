@@ -1,0 +1,22 @@
+{
+  "verified_at": "2026-11-06T11:46:24.866426+00:00",
+  "tool": "tlsx 1.1.9",
+  "release_sha256": "4b2480ca7be1dadf45ca9e861f3ea1147b56b976fe39f62fe1efa8c40ff8dec7",
+  "image": "sha256:869beef59e9961ddbafa64614a55ccb8f1b566b56f91023d7685c5f902371224",
+  "checks": {
+    "exact_public_ip_with_sni": true,
+    "successful_probe": true,
+    "certificate_dns_san_matches_authorized_hostname": true
+  },
+  "scope": "TLS observation of owned public backend from real isolated container; not full certificate trust validation or application profile activation",
+  "source_sha256": {
+    "deploy/scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "deploy/scanner_process.py": "6bf3caeccc871834275c5e02249a3a19e80943991754bc00c75b9963ed9c223b",
+    "deploy/scanner_network.py": "b6391898bec1eed1cfe65b07d9efa7b10190ecc4a1d1919e3e0a20037a4b08b0",
+    "deploy/scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2",
+    "deploy/scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "deploy/scanner_gitleaks.py": "155ff3264a0f226f7db106cf32e894d97dfe87e494556ada958171d51baa2fba",
+    "deploy/scanner_offline.py": "7d6feef2e2889b3577cf636dfa494559f5023be599e9ed65fb60ee88f729a971",
+    "deploy/scanner_tlsx.py": "baa00d27ea42dc434cd2a790a25dae99e016c998915437c22802e0b3ae74004a"
+  }
+}
