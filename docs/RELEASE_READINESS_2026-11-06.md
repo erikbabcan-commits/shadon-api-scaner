@@ -9,10 +9,11 @@ nie sú potvrdené produkčným deploymentom.
 Východiskový lokálny HEAD: `c5db6aeb9ae82839444076eeebd45c5ca5f6bc9b`, vetva
 `feat/straz-m2m-runs-read`. Opravy nad týmto commitom sú pripravené na review vo vetve
 `codex/production-readiness-20261106`; autoritatívny výsledný commit určuje HEAD pull requestu.
-Posledný pushnutý HEAD je `3dac520be44b3c576c682392c20817a3307e68e2` v
+Následné billing/staging opravy sú pushnuté v commite
+`f263da5fb38d1cf7b01689775d5e3369bbbb0126` v
 [PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/6), ktorý je
-otvorený a pripravený na review (`isDraft: false`). Aktuálne necommitnuté opravy
-z následnej kontroly ešte nie sú súčasťou tohto SHA.
+otvorený a pripravený na review (`isDraft: false`). Staršie výsledky nižšie sú
+priradené ku konkrétnym commitom; nenahrádzajú CI aktuálneho HEAD.
 
 ## Lokálne overené tímom
 
@@ -124,6 +125,9 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
   na `3dac520` (check `127643411379`): žiadne kroky sa nevykonali, backend a
   frontend boli preskočené. Predchádzajúci beh `42141257570` na `5a6186f` mal
   rovnaký billing blok; ani jeden nie je úspešným testovaním release.
+- Aj [beh na `f263da5`](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/runs/42151682188)
+  skončil tým istým billing blokom: check `127676161738` mal nula krokov,
+  backend a frontend boli preskočené. Na odblokovanie treba zásah vlastníka účtu.
 - Oprávnený prístup do Railway dashboardu bol obnovený cez existujúce GitHub
   prihlásenie; CLI naďalej vracia `Unauthorized`. Dashboard potvrdil projekt
   `dev-new`, environment `production` a štyri online služby (API, worker,
@@ -134,7 +138,7 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
   Toto nie je overenie skutočnej prihlasovacej cookie. Interpreter aplikácie je
   `/opt/venv/bin/python`; systémový Python nemá aplikačné závislosti.
   Presné runtime SHA workera, Alembic head,
-  produkčné runtime nastavenia a prevádzkové dôkazy ešte neboli získané.
+  ďalšie runtime nastavenia a prevádzkové dôkazy ešte neboli získané.
 
 ## Podmienky pred uzavretím release
 
