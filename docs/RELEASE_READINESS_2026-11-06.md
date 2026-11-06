@@ -6,7 +6,29 @@ testy, historické CI a hlásenie Lovable sú odlišné dôkazy. Lovable fronten
 publikovaný a verejné API prepojenie je overené; nové backendové opravy zatiaľ
 nie sú potvrdené produkčným deploymentom.
 
-## Aktuálny backendový kandidát 8c78029
+## Aktuálne natívne overenie 42d3ced a samostatný supervisor
+
+- **412 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
+  Python 3.12.13 a vlastnom Redis. Testovaný strom bol čistý; fingerprint teraz
+  zahŕňa aj supervisor moduly a scanner verifikačné/build skripty.
+  [Dôkaz a presné hashe](evidence/backend-supervisor-matrix-2026-11-06.json).
+  Rozsah zostáva SQLite API units + reálne PG/Redis/TLS/procesné/Git fixtures,
+  nie všetky API scenáre na PostgreSQL.
+- Ruff F/E9, default Mypy pre 50 aplikačných súborov a secret scan sledovaného
+  stromu prešli. Novší kontajnerový API/worker runtime po 8c78029 sa týmto
+  natívnym behom nepotvrdzuje.
+- Reálny samostatný VPS supervisor overil Gitleaks stdin/archív, TLS s pripnutou
+  IP a SNI, HTTP s Host/SNI a readiness 200, aj Git → validovaný tar → nový
+  offline Gitleaks kontajner. Job CLI a durable replay boli spustené ako nové
+  procesy. [Presné dôkazy a hranice](SCANNER_NETWORK_FIXTURE.md).
+- Všetkých osem aplikačných CLI profilov zostáva zablokovaných. Ešte chýba
+  autentifikovaný transport a queue/tenant admission integrácia, zvyšné adaptéry,
+  úplná funkčná akceptácia, reprodukovateľné images a retencia/rekonciliácia
+  receipts. Aktuálny Git tok je obmedzený verejný HEAD snapshot, nie celá história.
+- Produkčný deploy, migrácia, rotácia, billing odblokovanie, automatické backup
+  retencie/alerty a fyzický iPhone acceptance neboli týmto krokom dokončené.
+
+## Historický kontajnerový kandidát 8c78029
 
 Kandidát očakáva schému **010_alert_outbox_leases**. Produkčné nasadenie ani
 rotácia sa nevykonali. Staršie výsledky nižšie patria svojim uvedeným commitom.
