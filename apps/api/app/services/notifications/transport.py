@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import asyncio
 import json
+import uuid
 
 
 from app.models import AlertChannel
@@ -25,6 +26,8 @@ async def send_to_channel(
     detail: str | None,
     app_name: str | None,
     is_test_env: bool = False,
+    *,
+    event_id: uuid.UUID | None = None,
 ) -> bool:
     platform = channel.platform.lower()
 
@@ -41,7 +44,7 @@ async def send_to_channel(
                 payload = formatters.format_teams(channel, event_type, severity, title, detail, app_name)
                 res = await client.post(channel.destination_url, json=payload)
             elif platform == "webhook":
-                payload, headers = formatters.format_webhook(channel, event_type, severity, title, detail, app_name)
+                payload, headers = formatters.format_webhook(channel, event_type, severity, title, detail, app_name, event_id=event_id)
                 body = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
                 res = await client.post(channel.destination_url, content=body, headers=headers)
             elif platform == "ntfy":

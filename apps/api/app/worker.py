@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 import shutil
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from arq import cron
 from arq.connections import RedisSettings
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
@@ -29,7 +30,7 @@ from app.routers.findings import _invalidate_overview_cache
 
 logger = logging.getLogger("straz.worker")
 from app.services.findings import make_fingerprint, mark_absent_fixed, upsert_finding
-from app.services.internetdb import fetch_internetdb, resolve_public_ips
+from app.services.internetdb import fetch_internetdb
 from app.services.notifications import dispatch_alert, process_alert_outbox
 from app.services.scanners import (
     git_clone,
@@ -140,6 +141,7 @@ async def execute_scan_run(ctx, run_id: str) -> None:
         logger.info("Starting scan run %s (profile=%s, app=%s)", run_id, profile.value, app.name)
         await _set_run(db, rid, RunStatus.running)
         await db.commit()
+        started_at = run.started_at
 
         try:
             db.info["scan_run_id"] = rid
@@ -173,18 +175,40 @@ async def execute_scan_run(ctx, run_id: str) -> None:
             await db.commit()
             await _invalidate_overview_cache(settings, app.organization_id)
             logger.info("Scan run %s completed successfully (app=%s)", run_id, app.name)
+        except asyncio.CancelledError:
+            cleanup = asyncio.create_task(_fail_unfinished_run(db, rid, started_at, "Scanner execution cancelled"))
+            while True:
+                try:
+                    await asyncio.shield(cleanup)
+                    break
+                except asyncio.CancelledError:
+                    if cleanup.done():
+                        break
+                except Exception as exc:
+                    logger.error("Cancelled scan cleanup failed (error_type=%s)", type(exc).__name__)
+                    break
+            raise
         except Exception as exc:  # noqa: BLE001
-            logger.error("Scan run %s failed (error_type=%s)", run_id, type(exc).__name__)
-            await db.rollback()
-            async with SessionLocal() as db2:
-                await _set_run(db2, rid, RunStatus.failed, "Scanner execution failed")
-                await db2.commit()
+            logger.error("Scan run %s processing failed (error_type=%s)", run_id, type(exc).__name__)
+            await _fail_unfinished_run(db, rid, started_at, "Scanner execution failed")
         finally:
             if heavy and lock_token:
                 await redis.eval(
                     "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
                     1, settings.heavy_scan_lock_key, run_id,
                 )
+
+
+async def _fail_unfinished_run(db, run_id, started_at, message):
+    await db.rollback()
+    async with SessionLocal() as recovery:
+        # Never overwrite a committed result or another start of this run.
+        await recovery.execute(update(ScanRun).where(
+            ScanRun.id == run_id, ScanRun.status == RunStatus.running,
+            ScanRun.started_at == started_at,
+        ).values(status=RunStatus.failed, observations_complete=False,
+                 error=message, finished_at=datetime.now(timezone.utc)))
+        await recovery.commit()
 
 
 async def _heartbeat(db, app: App) -> None:
@@ -315,9 +339,9 @@ async def _internetdb(db, app: App, targets, redis) -> None:
     settings = get_settings()
     seen: set[str] = set()
     for target in targets:
-        ips = resolve_public_ips(target.host)
-        if not ips:
-            continue
+        # A failed or non-public DNS lookup is incomplete coverage, not an
+        # empty observation that may close existing vulnerability findings.
+        ips = await resolve_public_addresses(extract_hostname(target.host), 443)
         for ip in ips:
             for item in await fetch_internetdb(ip, settings=settings, redis=redis):
                 fp = make_fingerprint(item.fingerprint_key)
@@ -497,77 +521,49 @@ async def _gitleaks(db, app: App) -> None:
     )
 
 
-async def _schedule_profile(ctx, db, app: App, profile: ScanProfile) -> None:
-    from app.models import Organization
-    from app.services.quota import check_scan_quota, record_scan_admission
-    from app.services.audit import write_audit_log
-    if app.organization_id is None or profile in CLI_SCANNER_PROFILES:
-        return
-    org = await db.get(Organization, app.organization_id)
-    if org is None:
-        return
-    allowed, _ = await check_scan_quota(db, org, profile)
-    if not allowed:
-        await db.rollback()
-        return
-    app_id, org_id = app.id, org.id
-    run = ScanRun(id=uuid.uuid4(), app_id=app_id, profile=profile, status=RunStatus.queued)
-    db.add(run)
-    await record_scan_admission(db, org_id)
-    await write_audit_log(db, org_id=org_id, action="scan.trigger", entity_type="scan_run", entity_id=str(run.id), details={"trigger": "scheduler", "profile": profile.value})
-    await db.commit()
-    try:
-        await ctx["redis"].enqueue_job("execute_scan_run", str(run.id))
-    except Exception:
-        run.status = RunStatus.failed
-        run.error = "Scan queue unavailable"
-        await db.commit()
+async def _schedule_profile(ctx, db, app: App, profile: ScanProfile, *, now=None) -> None:
+    from app.services.scheduling import admit_scheduled_profile, publish_scheduled_run, utc_now
+
+    run = await admit_scheduled_profile(
+        db, app, profile, now=now or utc_now(),
+        blocked_profiles=CLI_SCANNER_PROFILES, production=get_settings().is_production,
+    )
+    if run is not None:
+        # A crash here leaves a durable queued admission. The next dispatcher
+        # republishes that same row/id, without consuming additional quota.
+        await publish_scheduled_run(ctx["redis"], run)
 
 
-async def heartbeat_all(ctx) -> None:
+async def scheduled_scans_all(ctx, *, now=None, profiles=None) -> None:
+    from app.services.scheduling import recover_scheduled_queue, utc_now
+
+    now = now or utc_now()
+    profiles = tuple(ScanProfile) if profiles is None else profiles
     async with SessionLocal() as db:
-        ids = list(await db.scalars(select(App.id).where(App.heartbeat_enabled.is_(True))))
+        await recover_scheduled_queue(
+            db, ctx["redis"], now=now,
+            blocked_profiles=CLI_SCANNER_PROFILES, production=get_settings().is_production,
+        )
+        ids = list(await db.scalars(select(App.id).where(App.organization_id.is_not(None)).order_by(App.id)))
         for app_id in ids:
-            app = await db.get(App, app_id)
-            if app:
-                await _schedule_profile(ctx, db, app, ScanProfile.heartbeat)
+            for profile in profiles:
+                app = await db.get(App, app_id)
+                if app is not None:
+                    await _schedule_profile(ctx, db, app, profile, now=now)
+
+
+# Keep already-enqueued legacy job names executable during deployment. They
+# use the same cadence/deduplication rules and have no independent cron jobs.
+async def heartbeat_all(ctx) -> None:
+    await scheduled_scans_all(ctx, profiles=(ScanProfile.heartbeat,))
 
 
 async def nuclei_weekly_all(ctx) -> None:
-    async with SessionLocal() as db:
-        ids = list(await db.scalars(select(App.id).where(App.safe_enabled.is_(True))))
-        for app_id in ids:
-            app = await db.get(App, app_id)
-            if app:
-                await _schedule_profile(ctx, db, app, ScanProfile.safe)
+    await scheduled_scans_all(ctx, profiles=(ScanProfile.safe,))
 
 
 async def supply_chain_weekly_all(ctx) -> None:
-    async with SessionLocal() as db:
-        ids = list(await db.scalars(select(App.id)))
-        for app_id in ids:
-            for profile, flag, source in ((ScanProfile.trivy_fs, "trivy_enabled", "git_url"), (ScanProfile.trivy_image, "trivy_enabled", "image_ref"), (ScanProfile.gitleaks, "gitleaks_enabled", "git_url")):
-                app = await db.get(App, app_id)
-                if app and getattr(app, flag) and getattr(app, source):
-                    await _schedule_profile(ctx, db, app, profile)
-
-
-def _parse_cron(expr: str, fn):
-    parts = expr.split()
-    if len(parts) != 5:
-        return cron(fn, hour=3, minute=0, weekday=0)
-    minute, hour, _dom, _mon, dow = parts
-
-    def _num(v: str, default: int = 0) -> int:
-        return default if v == "*" else int(v)
-
-    wd = None if dow == "*" else (int(dow) + 6) % 7
-    return cron(
-        fn,
-        hour=_num(hour, 3),
-        minute=_num(minute, 0),
-        weekday=wd if wd is not None else 0,
-    )
+    await scheduled_scans_all(ctx, profiles=(ScanProfile.trivy_fs, ScanProfile.trivy_image, ScanProfile.gitleaks))
 
 
 async def startup(ctx) -> None:
@@ -591,6 +587,7 @@ class WorkerSettings:
     settings = get_settings()
     functions = [
         execute_scan_run,
+        scheduled_scans_all,
         heartbeat_all,
         nuclei_weekly_all,
         supply_chain_weekly_all,
@@ -598,9 +595,8 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
+    timezone = timezone.utc
     cron_jobs = [
         cron(process_alert_outbox, minute=set(range(60))),
-        cron(heartbeat_all, minute={i for i in range(0, 60, max(1, settings.heartbeat_interval_minutes))}),
-        _parse_cron(settings.nuclei_weekly_cron, nuclei_weekly_all),
-        _parse_cron(settings.supply_chain_weekly_cron, supply_chain_weekly_all),
+        cron(scheduled_scans_all, minute=set(range(60)), run_at_startup=True),
     ]

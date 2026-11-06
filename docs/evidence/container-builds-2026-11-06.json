@@ -1,0 +1,30 @@
+{
+  "observed_at_utc": "2026-11-06T09:05:43.161947+00:00",
+  "source_commit": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+  "clean_tracked_export": true,
+  "context": "OrbStack existing local daemon; builds sequential",
+  "platform": "linux/amd64",
+  "builds": [
+    {
+      "image": "straz-api:1e2db87",
+      "id": "sha256:27a32cd56d5e37ec01c360b46551d5416a932edc974cfa1122c3d534ba28e05b",
+      "architecture": "amd64",
+      "revision": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+      "dockerfile_sha256": "685426c21ea39a3595c80b2da4f9634540931b6352cbfaa4d83b8ac189b95be9"
+    },
+    {
+      "image": "straz-worker:1e2db87",
+      "id": "sha256:c6402fe7693e8ee93dd63bec904222a5413e6c8892b5fc177320555b76a60e1d",
+      "architecture": "amd64",
+      "revision": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+      "dockerfile_sha256": "2c40b75493d3a39d7873921511644a3c4500b429a7847c48a46ca1bad6dcdf96"
+    },
+    {
+      "image": "straz-legacy-web:1e2db87",
+      "id": "sha256:97e484079758f0575cfbe04852a22b1528b6735c8d87b90f4b3aaa25b7378d3b",
+      "architecture": "amd64",
+      "revision": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+      "dockerfile_sha256": "2be6af6e25856a2c21be9c063eecbd6b04da75e4a9fffa0b9da5a477ae31e9da"
+    }
+  ]
+}

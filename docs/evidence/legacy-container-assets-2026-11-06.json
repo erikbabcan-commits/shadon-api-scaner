@@ -1,0 +1,13 @@
+{
+  "image": "straz-legacy-web:1e2db87",
+  "source_commit": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+  "checks": {
+    "index.html copied": true,
+    "sw.js copied": true,
+    "manifest.webmanifest copied": true,
+    "NetworkOnly present in generated service worker": true,
+    "read-only destination fails instead of reporting success": true
+  },
+  "alpine_version": "3.24.4",
+  "owned_test_container_removed": true
+}

@@ -1,0 +1,19 @@
+{
+  "verified_at": "2026-11-06T11:32:22.035318+00:00",
+  "scope": "Real Docker execution on selected VPS; BusyBox synthetic fixture, not Gitleaks or application profile activation",
+  "image": "sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+  "checks": {
+    "synthetic_stdin_roundtrip": true,
+    "timeout_failure": true,
+    "output_limit_failure": true,
+    "owned_containers_removed": true,
+    "existing_containers_still_running": true
+  },
+  "source_sha256": {
+    "deploy/scanner_offline.py": "7d6feef2e2889b3577cf636dfa494559f5023be599e9ed65fb60ee88f729a971",
+    "deploy/scanner_process.py": "6bf3caeccc871834275c5e02249a3a19e80943991754bc00c75b9963ed9c223b",
+    "deploy/scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "deploy/scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "deploy/scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2"
+  }
+}

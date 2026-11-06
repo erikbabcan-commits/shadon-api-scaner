@@ -17,7 +17,7 @@ dependencies = [
   "arq>=0.26.1",
   "redis>=5.2.0",
   "python-multipart>=0.0.17",
-  "dnspython>=2.7.0",
+  "dnspython>=2.9.0",
   "email-validator>=2.2.0",
   "cvss>=3.6",
 ]
@@ -51,3 +51,6 @@ pythonpath = ["."]
 filterwarnings = [
   "ignore::DeprecationWarning",
 ]
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/typings"

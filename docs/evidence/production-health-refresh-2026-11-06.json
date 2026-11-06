@@ -1,0 +1,54 @@
+{
+  "observed_at_utc": "2026-11-06T10:19:51.523331+00:00",
+  "scope": "Unauthenticated read-only public HTTPS probes; no production writes or secrets",
+  "checks": [
+    {
+      "origin": "https://straz-api-production.up.railway.app",
+      "path": "/healthz/liveness",
+      "status": 200,
+      "ready": null,
+      "no_store": true,
+      "hsts": false
+    },
+    {
+      "origin": "https://straz-api-production.up.railway.app",
+      "path": "/healthz/readiness",
+      "status": 200,
+      "ready": true,
+      "no_store": true,
+      "hsts": false
+    },
+    {
+      "origin": "https://straz-api-production.up.railway.app",
+      "path": "/api/auth/me",
+      "status": 401,
+      "ready": null,
+      "no_store": true,
+      "hsts": false
+    },
+    {
+      "origin": "https://straz-security-beacon.lovable.app",
+      "path": "/healthz/liveness",
+      "status": 200,
+      "ready": null,
+      "no_store": true,
+      "hsts": true
+    },
+    {
+      "origin": "https://straz-security-beacon.lovable.app",
+      "path": "/healthz/readiness",
+      "status": 200,
+      "ready": true,
+      "no_store": true,
+      "hsts": true
+    },
+    {
+      "origin": "https://straz-security-beacon.lovable.app",
+      "path": "/api/auth/me",
+      "status": 401,
+      "ready": null,
+      "no_store": true,
+      "hsts": true
+    }
+  ]
+}

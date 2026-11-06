@@ -1,0 +1,33 @@
+# Compose >= 2.30.0; use staging.py as documented in STAGING.md.
+name: straz-staging
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique staging database password}
+
+  api:
+    env_file: !override
+      - path: ../.env.staging
+        format: raw
+    environment:
+      DATABASE_URL: !reset null
+      REDIS_URL: !reset null
+      STRAZ_ENV: staging
+      STRAZ_ADMIN_EMAIL: ${STRAZ_ADMIN_EMAIL:?Set a staging administrator email}
+      STRAZ_ADMIN_PASSWORD: ${STRAZ_ADMIN_PASSWORD:?Set a unique staging administrator password}
+      STRAZ_SESSION_SECRET: ${STRAZ_SESSION_SECRET:?Set a unique staging session secret}
+
+  worker:
+    env_file: !override
+      - path: ../.env.staging
+        format: raw
+    environment:
+      DATABASE_URL: !reset null
+      REDIS_URL: !reset null
+      STRAZ_ENV: staging
+
+  caddy:
+    ports: !override
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"

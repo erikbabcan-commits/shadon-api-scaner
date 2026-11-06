@@ -347,7 +347,7 @@ async def test_notifications_are_transactional_without_network(db_session, conte
 
 def test_missing_scan_coverage_does_not_claim_compliance():
     from app.services.compliance import evaluate_nis2_areas
-    assert all(area["status"] == "WARNING" for area in evaluate_nis2_areas([]))
+    assert all(area["status"] == "NOT_ASSESSED" for area in evaluate_nis2_areas([]))
 
 
 async def test_audit_orm_rejects_mutation(db_session, context):

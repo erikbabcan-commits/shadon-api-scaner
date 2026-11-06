@@ -25,8 +25,8 @@ nepotvrdzujú produkčné nasadenie ani rotáciu tajomstiev.
 - [ ] Overiť správny Railway projekt **dev-new**, environment **production**
   a služby **straz-api**, **straz-worker**, **Postgres**, **Redis**.
   Frontend patrí Vercel projektu **straz-monitoring**.
-- [ ] Výslovne schváliť zlúčenie [PR #4](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/4).
-  Pred merge znovu skontrolovať aktuálny HEAD, diff a CI.
+- [x] [PR #4](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/4) bol zlúčený 27. 10. 2026.
+  Pred ďalším release znovu skontrolovať aktuálny HEAD, diff a CI; historické výsledky nenahrádzajú nové kontroly.
 - [ ] Samostatne schváliť produkčnú rotáciu a nasadenie. Hodnoty tajomstiev
   nevkladať do chatu, príkazových argumentov, logov ani Gitu.
 
@@ -178,7 +178,7 @@ Systém obsahuje 6 kompletne implementovaných a otestovaných modulov:
 
 ### Požiadavky
 * Python 3.12+ a balíčkovací manažér [uv](https://docs.astral.sh/uv/)
-* Node.js 20+ a npm
+* Node.js 22.12+ (vetva 22 podľa `.node-version`) a npm
 * *(Voliteľné)* Docker pre kompletný stack s Redis a PostgreSQL
 
 ### 1. Spustenie lokálneho prostredia (Najrýchlejšia cesta)
@@ -195,7 +195,7 @@ uv run uvicorn app.main:app --port 8000
 
 # Krok 3: Spustenie Vite frontendu (Terminál 2)
 cd ../web
-npm install
+npm ci
 npm run dev
 ```
 

@@ -1,0 +1,41 @@
+{
+  "observed_at_utc": "2026-11-06T12:47:18.305242+00:00",
+  "user_approval": "Explicit approval to publish existing frontend main 2ad7b42",
+  "frontend_main": "2ad7b42200f8a64b0fd23b03844eafca17a9c159",
+  "tested_candidate": "828c46344849aca0fd1d20053b72c04b21a816cc",
+  "matching_git_tree": "5a15bd920332e2568824942381cdf797c33995d2",
+  "url": "https://straz-security-beacon.lovable.app/",
+  "ci_run": "https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42218319847",
+  "ci_conclusion": "success",
+  "tests_passed": 85,
+  "publication": {
+    "method": "Authenticated Chrome Lovable Publish changes",
+    "confirmation_observed": "Your website was updated",
+    "latest_editor_merge_observed": "Merge pull request #3",
+    "screenshot_captured_at_utc": "2026-11-06T12:41:03.076428+00:00",
+    "screenshot_sha256": "454e9fd008c1d456b37f8f8cc2257048e22f03ca38615a65fcfec2808aae603a"
+  },
+  "live_chrome": {
+    "authenticated_dashboard_visible": true,
+    "checking_session_visible": false,
+    "login_form_visible": false,
+    "title": "Prehľad — Stráž",
+    "og_type": "website",
+    "twitter_card": "summary",
+    "client_script": "/assets/index-Dbr2yTYB.js",
+    "client_script_name_matches_tested_lovable_build": true
+  },
+  "live_service_worker": {
+    "source": "Chrome visible plaintext DOM at /sw.js",
+    "trimmed_source_exactly_matches_tested_dist_client_sw": true,
+    "sha256": "4be450a9d7317b7a3ee5d961a6f1935ef8a49af72b11fda56fb48d706ad12095",
+    "static_precache_entries": 27,
+    "tested_with_repository_pwa_inspector": true,
+    "private_network_only_paths_checked": 8,
+    "navigation_network_only_paths_checked": 4
+  },
+  "backend_deployed": false,
+  "database_migrated": false,
+  "secrets_rotated": false,
+  "scope": "Frontend publication and live Chrome/asset identity proof only. No physical iPhone acceptance, browser offline/cache audit, all tenant flows, backend release or full AAA production claim. Lovable did not display a deployed Git SHA; editor latest merge plus live tested client bundle name and exact SW match are the linkage evidence."
+}

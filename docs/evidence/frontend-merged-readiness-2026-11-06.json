@@ -1,0 +1,15 @@
+{
+  "observed_at_utc": "2026-11-06T12:34:56.942327+00:00",
+  "frontend_main": "2ad7b42200f8a64b0fd23b03844eafca17a9c159",
+  "tested_candidate": "828c46344849aca0fd1d20053b72c04b21a816cc",
+  "matching_git_tree": "5a15bd920332e2568824942381cdf797c33995d2",
+  "ci_run": "https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42218319847",
+  "ci_conclusion": "success",
+  "tests_passed": 85,
+  "normal_and_lovable_precached_static_assets": 27,
+  "private_network_only_paths_checked": 8,
+  "navigation_network_only_paths_checked": 4,
+  "lovable_editor_latest_merge_observed": true,
+  "unpublished_changes_observed": true,
+  "scope": "Git main and CI/local builds/editor sync only; no latest publication, physical iPhone, production cache audit or backend rollout proof"
+}

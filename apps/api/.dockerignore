@@ -4,4 +4,12 @@ __pycache__
 .pytest_cache
 .env*
 *.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.sql.gz
+*.key
+*.pem
+backups
 tests

@@ -604,6 +604,7 @@ export function AppDetailPage() {
     await qc.invalidateQueries({ queryKey: ["overview"] });
     await qc.invalidateQueries({ queryKey: ["runs"] });
     await qc.invalidateQueries({ queryKey: ["findings"] });
+    await qc.invalidateQueries({ queryKey: ["app-compliance", appId] });
   };
 
   const deleteMutation = useMutation({
@@ -671,7 +672,7 @@ export function AppDetailPage() {
           <>
             <AppHeader app={app} />
 
-            <CompliancePanel appId={appId} />
+            <CompliancePanel appId={appId} hasVerifiedTarget={hasVerified} />
 
             <AppScansSection
               appId={appId}

@@ -1,0 +1,64 @@
+{
+  "observed_at_utc": "2026-11-06T10:39:04.839316+00:00",
+  "source_commit": "35014e36faf624d69ad897bfa591c098d96356a7",
+  "before_revision": "008_postgres_uuid_and_audit_fk",
+  "after_revision": "010_alert_outbox_leases",
+  "source_archive_checksum_verified": true,
+  "restored_counts_match_source_snapshot": true,
+  "original_application_data_hashes_preserved": true,
+  "compared_application_tables": 15,
+  "audit_before": {
+    "update_rejected": true,
+    "delete_rejected": true
+  },
+  "audit_after": {
+    "update_rejected": true,
+    "delete_rejected": true
+  },
+  "current_head_startup_guard_passed": true,
+  "restore_isolation": "Private owner-only Unix socket, TCP disabled; no API, worker, scheduler or integrations",
+  "production_database_modified": false,
+  "migration_files": [
+    {
+      "path": "apps/api/alembic/versions/001_initial_schema.py",
+      "sha256": "b415c1ea10ceeafafacedcf65b40b974887faaede4f660aec403bc588208c838"
+    },
+    {
+      "path": "apps/api/alembic/versions/002_organizations_and_rbac.py",
+      "sha256": "64e7686b3e50237cd3bc069d6b533e4aa7df12a16a07b16e9189e2c8677c0a05"
+    },
+    {
+      "path": "apps/api/alembic/versions/003_billing_and_quotas.py",
+      "sha256": "95765ea331cd9945c7752be78e225c0184e45fe63a55f3540d1d35884d557745"
+    },
+    {
+      "path": "apps/api/alembic/versions/004_branding_and_compliance.py",
+      "sha256": "4cab50eeb0368fd11484ef7e5dea395bb65f18aba344951550dd0d5ab835ea5c"
+    },
+    {
+      "path": "apps/api/alembic/versions/005_integrations_and_alerting.py",
+      "sha256": "f6ab8034d30c66022450c72591b616642739098fb8cf15e4bf06c9f2301db067"
+    },
+    {
+      "path": "apps/api/alembic/versions/006_api_keys_and_ci.py",
+      "sha256": "d365dda24f951867076dfc09028f4000c091852b5b83f69073d6cd91c315bbde"
+    },
+    {
+      "path": "apps/api/alembic/versions/007_audit_log_and_health.py",
+      "sha256": "9e99284cf0f1d649f68c84b01c67e611426df523cf10330a8ad39cdba80c091f"
+    },
+    {
+      "path": "apps/api/alembic/versions/008_postgres_uuid_and_audit_fk.py",
+      "sha256": "5e4fddbd03c3dbd5b6aeef4b0575ccaeda26497f9ed3be355939a655b557a7d0"
+    },
+    {
+      "path": "apps/api/alembic/versions/009_cvss_and_poc_fields.py",
+      "sha256": "9e031f057e147607b37e59f8fc3de2b3db0cf6e5b920a49a585dc4d7be048df0"
+    },
+    {
+      "path": "apps/api/alembic/versions/010_alert_outbox_leases.py",
+      "sha256": "c158c5f2e749d7f397a4cf2780d0d97b6ccad9ba42cf2e748c327afdd70e09ac"
+    }
+  ],
+  "restored_working_copy_removed": true
+}

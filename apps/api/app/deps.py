@@ -29,7 +29,7 @@ API_KEY_ROUTES: dict[tuple[str, str], frozenset[str]] = {
     ("GET", "/api/apps/{app_id}/compliance"): frozenset({"reports:read"}),
     ("GET", "/api/apps/{app_id}/report/html"): frozenset({"reports:read"}),
     ("POST", "/api/ci/scan"): frozenset({"ci:scan"}),
-    ("GET", "/api/ci/runs/{run_id}"): frozenset({"ci:scan"}),
+    ("GET", "/api/ci/runs/{run_id}"): frozenset({"ci:runs:read"}),
 }
 
 
@@ -111,9 +111,12 @@ async def get_current_user(
         route = request.scope.get("route")
         required = next((scopes for (method, path), scopes in API_KEY_ROUTES.items()
             if method == request.method and compile_path(path)[0].fullmatch(request.url.path)), None)
-        if required is None or not required.issubset(set(api_key.scopes or [])):
+        key_scopes = set(api_key.scopes or [])
+        if "ci:scan" in key_scopes:
+            key_scopes.add("ci:runs:read")
+        if required is None or not required.issubset(key_scopes):
             raise HTTPException(status_code=403, detail="Nedostatočné oprávnenia API kľúča")
-        if "ci:scan" in required and ROLE_HIERARCHY[membership.role] < ROLE_HIERARCHY[OrgRole.member]:
+        if ("ci:scan" in required or "ci:runs:read" in required) and ROLE_HIERARCHY[membership.role] < ROLE_HIERARCHY[OrgRole.member]:
             raise HTTPException(status_code=403, detail="CI scans require member role")
         api_key.last_used_at = now
         from app.services.audit import write_audit_log
@@ -262,10 +265,12 @@ def require_scope(scope: str):
     async def scope_checker(
         org_context: OrgContext = Depends(get_current_org),
     ) -> OrgContext:
-        if scope == "ci:scan" and ROLE_HIERARCHY[org_context.role] < ROLE_HIERARCHY[OrgRole.member]:
+        if scope in ("ci:scan", "ci:runs:read") and ROLE_HIERARCHY[org_context.role] < ROLE_HIERARCHY[OrgRole.member]:
             raise HTTPException(status_code=403, detail="CI scans require member role")
         if org_context.api_key:
-            scopes = org_context.api_key.scopes or []
+            scopes = set(org_context.api_key.scopes or [])
+            if "ci:scan" in scopes:
+                scopes.add("ci:runs:read")
             if scope not in scopes:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,

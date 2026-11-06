@@ -1,0 +1,16 @@
+{
+  "real_guard_test_passed": true,
+  "policy": {
+    "namespace_pinned": true,
+    "host_namespace_rejected": true,
+    "fresh_ruleset_required": true,
+    "kernel_drop_chains_verified": true
+  },
+  "guard_removed": true,
+  "preexisting_containers_preserved": true,
+  "image_id": "sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+  "image_digest": [
+    "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662"
+  ],
+  "scope": "Real Docker guard lifecycle and namespace policy only; no scanner invocation"
+}

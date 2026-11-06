@@ -1,0 +1,26 @@
+{
+  "observed_at_utc": "2026-11-06T10:21:50.797245+00:00",
+  "source_commit": "3777a377faa161fc771aa2f69b9101954cc39836",
+  "platform": "linux/amd64",
+  "source": "clean git archive",
+  "images": {
+    "straz-api:3777a37": {
+      "id": "sha256:61515af47a4ef95ef2e11292fb4c90a60125bdcf5b0dcd4b6bc810649570711d",
+      "architecture": "amd64",
+      "user": "appuser",
+      "dockerfile_sha256": "685426c21ea39a3595c80b2da4f9634540931b6352cbfaa4d83b8ac189b95be9"
+    },
+    "straz-worker:3777a37": {
+      "id": "sha256:c87961b8d3f366425356acae8e976617cccf2711a842ae89917a93d98101ffab",
+      "architecture": "amd64",
+      "user": "straz",
+      "dockerfile_sha256": "2c40b75493d3a39d7873921511644a3c4500b429a7847c48a46ca1bad6dcdf96"
+    },
+    "straz-legacy-web:3777a37": {
+      "id": "sha256:5e36a7387348f87d669d2775f43d942d2c23cf68a9dec57cab692811779edcfc",
+      "architecture": "amd64",
+      "user": "",
+      "dockerfile_sha256": "2be6af6e25856a2c21be9c063eecbd6b04da75e4a9fffa0b9da5a477ae31e9da"
+    }
+  }
+}

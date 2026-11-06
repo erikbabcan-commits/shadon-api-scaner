@@ -1,0 +1,80 @@
+{
+  "observed_at_utc": "2026-11-06T13:04:43.839883+00:00",
+  "host": "Selected existing ubuntu-2gb-hel1-1 Linux AMD64 Docker host",
+  "results": [
+    {
+      "tool": "tlsx",
+      "version": "1.1.9",
+      "release_url": "https://github.com/projectdiscovery/tlsx/releases/download/v1.1.9/tlsx_1.1.9_linux_amd64.zip",
+      "release_sha256": "4b2480ca7be1dadf45ca9e861f3ea1147b56b976fe39f62fe1efa8c40ff8dec7",
+      "binary_sha256": "4bc6fdfe4f8be76325a88154be7481f047c1ada67620653a989f8b7c470964f9",
+      "license_sha256": "49982116f64385bdf8582a379e591a19d6040dec22e50e29dc311596d357af23",
+      "base": "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "base_image_id": "sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "context_sha256": "0d99e7e9d2fed118cdd5096bb1b7e6b9973d67df5b5805be55a820fbda94c8b8",
+      "image": "sha256:48867cc2dd14934d334fa3e798e320e071eff6d8858b27f7376ded5fc683f962",
+      "uncached_builds": 2,
+      "matching_image_ids": true,
+      "scope": "Same selected host/BuildKit reproduction; no cross-builder or runtime acceptance claim",
+      "offline_nonroot_readonly_version_execution": true,
+      "guarded_owned_tls_probe_completed": true,
+      "tls_findings_count": 0
+    },
+    {
+      "tool": "httpx",
+      "version": "1.6.10",
+      "release_url": "https://github.com/projectdiscovery/httpx/releases/download/v1.6.10/httpx_1.6.10_linux_amd64.zip",
+      "release_sha256": "e7eb8473530c2d0eb4eb132c7253c0138745d622970f36413c1f349ddd60edb7",
+      "binary_sha256": "a498c7f8c548c54eb74d3ed0e5540b591f148a3394479197ed33552905a2fce6",
+      "license_sha256": "cbcdaab87df3175107aa28915bd253cebdd618a49c9ac5d6c669c0b1cbebcacb",
+      "base": "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "base_image_id": "sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
+      "context_sha256": "db63f564987c50b3d6abb241f08ce884e14647c6989e24ec96ed6d44f5907b19",
+      "image": "sha256:e1b267066bd0ecd448fce4897b28be837955c9db2199eaeb652e6ca6ec867105",
+      "uncached_builds": 2,
+      "matching_image_ids": true,
+      "scope": "Same selected host/BuildKit reproduction; no cross-builder or runtime acceptance claim",
+      "offline_nonroot_readonly_version_execution": true,
+      "guarded_owned_readiness_status": 200
+    }
+  ],
+  "source_sha256": {
+    "scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "scanner_process.py": "a09372943bd8727bdf67b92979f5d6b0a879b3077c08a139fcd76ce535830768",
+    "scanner_archive.py": "476c4e7d1deeed55781446e282438576bd1484bd7f58e02bfd5cffcd40d2bd48",
+    "scanner_network.py": "e898b0513e0f7a8418ac120468cece1bc6340f76a0ed08f3d2a6829a7384ad0a",
+    "scanner_job_cli.py": "a4bd7124149301ed686d5fa1f59505abcdb7a825e4a792a213619330dbb90423",
+    "scanner_naabu.py": "3b4efa4af3d6c571fab9b7e7f05be4618f654a6a2b66c1194554f4bcd6b717ca",
+    "scanner_httpx.py": "1436ab1f219d6f45c1bfdcdcf5ce5402a702306098de0f70a8ad26fd796e9a39",
+    "scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2",
+    "scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "scanner_git.py": "aab525913124ba301ff79712f87efa03e1f128dcbbdb25660c331b86f6eca3b5",
+    "scanner_gitleaks.py": "6f8269e9e53e302c94e502291453c72daa13102abe584edbbdbf68183986a5d4",
+    "scanner_trivy.py": "281cfc0e1859bee96d7ab80c5923dd1940eae2e31414bf1044c1e3c19e937c5f",
+    "scanner_state.py": "06736a473d0595b33f738bbbaddf45045cec065dca45c3ad9d35ba3a268698be",
+    "scanner_offline.py": "a75a6dd057877d7e735674b37a107bf7fef5785edcf85242aa3ec5f150dd49e3",
+    "scanner_job.py": "7f5a4a8c977c6722f273785bc740b15759d5f79cadd7724901cfdc7832485ab3",
+    "scanner_tlsx.py": "baa00d27ea42dc434cd2a790a25dae99e016c998915437c22802e0b3ae74004a",
+    "build_scanner_projectdiscovery.py": "7333122c201c028076577ed316ca820604b907bf6882370ecacd388d3b1b269b"
+  },
+  "running_containers_before": 14,
+  "running_containers_after": 14,
+  "existing_running_containers_preserved": true,
+  "free_bytes_before": 912498688,
+  "free_bytes_after": 502173696,
+  "application_scanner_profiles_activated": false,
+  "production_app_deployed": false,
+  "scope": "Actual operator main built each tool twice uncached on selected host, offline version ran, then each adapter probed one existing owned public API TLS/readiness endpoint under exact-IP/TCP guard. No tenant admission, all-profile functionality, general certificate trust or cross-version builder guarantee.",
+  "local_orbstack_comparison": {
+    "tlsx": {
+      "matching_image_id": true,
+      "matching_context_sha256": true
+    },
+    "httpx": {
+      "matching_image_id": true,
+      "matching_context_sha256": true
+    }
+  },
+  "local_operator_builder_source_sha256": "7333122c201c028076577ed316ca820604b907bf6882370ecacd388d3b1b269b",
+  "cross_host_scope": "Image IDs/context hashes matched on these two observed builders only; not a guarantee across all BuildKit versions or future source changes."
+}

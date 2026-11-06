@@ -212,7 +212,7 @@ async def ci_scan(
 async def get_ci_run_status(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    org_ctx: OrgContext = Depends(require_scope("ci:scan")),
+    org_ctx: OrgContext = Depends(require_scope("ci:runs:read")),
 ) -> Response:
     stmt = (
         select(ScanRun)

@@ -1,0 +1,83 @@
+{
+  "observed_at_utc": "2026-11-06T09:02:48.791256+00:00",
+  "source_commit": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+  "scope": "Native macOS ARM64, Python 3.12.13 frozen uv.lock. Full suite includes SQLite-backed API unit tests, real PostgreSQL migration/cutover tests on isolated 16.15 and 18.6, and Redis quota tests with a separate Redis per run. This is not 144 API tests against each PostgreSQL server.",
+  "results": [
+    {
+      "postgres": "16",
+      "pytest_exit": 0,
+      "summary": "144 passed in 93.74s (0:01:33)"
+    },
+    {
+      "postgres": "18",
+      "pytest_exit": 0,
+      "summary": "144 passed in 45.03s",
+      "synthetic_backup_restore": {
+        "format": "custom",
+        "backup_revision": "008_postgres_uuid_and_audit_fk",
+        "source_after_cutover": "009_cvss_and_poc_fields",
+        "restored_revision": "008_postgres_uuid_and_audit_fk",
+        "restored_counts": {
+          "apps": 1,
+          "findings": 1,
+          "audit_events": 1
+        },
+        "relationships_preserved": true,
+        "audit_immutability_preserved": true,
+        "sha256": "9860007e85be0ae9047196a63cc93ece0c3015eda6d5b148bc1d47a63af326db",
+        "production_data_used": false
+      }
+    }
+  ],
+  "production_data_used": false,
+  "secure_logout_regression": {
+    "failed_before_fix": 2,
+    "auth_tests_passed_after_fix": 10
+  },
+  "tested_files": [
+    {
+      "path": "apps/api/uv.lock",
+      "sha256": "ca7c1e95e6b746a9d5da9b996e2f6e56a371842d62ff8e9808fd75b2c8e57b51"
+    },
+    {
+      "path": "apps/api/app/routers/auth.py",
+      "sha256": "cdf62e484f39677b9fdfc4b5b677d8a98f4fbee8cac97fc690998c6f9c136e62"
+    },
+    {
+      "path": "apps/api/tests/test_auth.py",
+      "sha256": "485492c90febecd02cfeada198b69a246cf29257db6fd53808575d3a872e6fdf"
+    },
+    {
+      "path": "apps/api/app/migrations.py",
+      "sha256": "255f8cdbcf17ce9e1e6f0d8f23bb5ad97cb1fe2278731c22ba65190fe91a2495"
+    },
+    {
+      "path": "apps/api/alembic/env.py",
+      "sha256": "d10404af0411e135f141844a5eb42175d697b2ecf54d3e4aecc13dc974208b22"
+    },
+    {
+      "path": "apps/api/tests/test_migrations.py",
+      "sha256": "0e6c1087dd447081249f9119f5bc45acf293cb1c7dae89c081f0a883dbb00852"
+    },
+    {
+      "path": "apps/api/tests/test_pg_cutover_009.py",
+      "sha256": "5a408fe7ae01bc4a177520d4f917c2ff312077094331bffbed91659cd8cb76a3"
+    },
+    {
+      "path": "deploy/staging.py",
+      "sha256": "6852684c96e95d3c4be1587c00df530869329cf9f374c714842a02dc4db6969e"
+    },
+    {
+      "path": "deploy/docker-compose.yml",
+      "sha256": "996ad7e632435dfa336d819e341eb5cae8e223af862d2443aa4b4796da90d021"
+    },
+    {
+      "path": "deploy/docker-compose.staging.yml",
+      "sha256": "e84dd5a9b57186dbe65d6569c81052f8c3c1f7d08d52d4643980c32d89a1badb"
+    },
+    {
+      "path": "apps/api/tests/test_staging_compose.py",
+      "sha256": "f6f0e9d6da380eb19a55c909150605d81d5c42368adfd0c68f2c642f2da776d1"
+    }
+  ]
+}

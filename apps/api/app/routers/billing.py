@@ -11,7 +11,7 @@ from app.db import get_db
 from app.deps import OrgContext, require_org_role
 from app.models import OrgRole
 from app.services.audit import write_audit
-from app.services.quota import PLANS, get_org_usage_stats
+from app.services.quota import PLANS, get_org_usage_stats, get_current_period_bounds
 from app.services.stripe import (
     create_checkout_session,
     create_customer_portal_session,
@@ -92,6 +92,59 @@ async def customer_portal(
     )
     await db.commit()
     return session
+
+
+class SimulateActivationRequest(BaseModel):
+    tier: str
+
+
+@router.post("/simulate-activation")
+async def simulate_activation(
+    body: SimulateActivationRequest,
+    db: AsyncSession = Depends(get_db),
+    org_ctx: OrgContext = Depends(require_org_role(OrgRole.admin)),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Grant a synthetic plan only after explicit opt-in outside production."""
+    if settings.is_production:
+        raise HTTPException(
+            status_code=403,
+            detail="Simulated activation is unavailable in production",
+        )
+    if not settings.straz_allow_simulated_billing:
+        raise HTTPException(
+            status_code=403,
+            detail="Simulated activation is disabled",
+        )
+    tier = body.tier.lower()
+    if tier not in ("free", "starter", "pro", "agency"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid plan tier: '{tier}'. Must be free, starter, pro, or agency.",
+        )
+
+    org = org_ctx.organization
+    if org.stripe_subscription_id:
+        raise HTTPException(status_code=409, detail="Organization has a Stripe subscription")
+    previous_tier = org.plan_tier
+    org.plan_tier = tier
+    org.subscription_status = "active"
+    start, end = get_current_period_bounds(org)
+    org.current_period_start = start
+    org.current_period_end = end
+
+    await write_audit(
+        db,
+        action="billing.simulated_activation",
+        org_id=org_ctx.org_id,
+        user_id=org_ctx.user.id,
+        entity_type="organization",
+        entity_id=str(org_ctx.org_id),
+        detail=f"Simulated plan activation from {previous_tier} to {tier}",
+        details={"previous_tier": previous_tier, "next_tier": tier},
+    )
+    await db.commit()
+    return {"status": "activated", "tier": tier}
 
 
 @router.post("/webhook")

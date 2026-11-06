@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "baseline_all_reachable": true,
+    "allowed_endpoint_reachable": true,
+    "wrong_port_blocked": true,
+    "other_public_ip_blocked": true,
+    "private_ip_blocked": true,
+    "metadata_ip_blocked": true
+  },
+  "all_passed": true,
+  "scope": "IPv4 TCP wire fixture only; no scanner integration or IPv6 wire proof",
+  "host_network_modified": false
+}

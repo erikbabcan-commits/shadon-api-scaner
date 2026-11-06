@@ -5,9 +5,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models import AuditEvent, Organization, OrganizationMember, OrgRole, User
+from app.models import Organization, OrganizationMember, OrgRole, User
 from app.security import create_session_token, hash_password
-from app.services.audit import sanitize_audit_details, write_audit_log
+from app.services.audit import write_audit_log
 
 
 @pytest.mark.asyncio

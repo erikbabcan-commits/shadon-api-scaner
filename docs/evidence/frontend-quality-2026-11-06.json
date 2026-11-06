@@ -1,0 +1,20 @@
+{
+  "observed_at_utc": "2026-11-06T10:26:29.463025+00:00",
+  "repository": "youh4ck3dme/straz-security-beacon",
+  "source_commit": "62db7404138e9fe7ea2c7497af5608d5d86bbe85",
+  "pull_request": "https://github.com/youh4ck3dme/straz-security-beacon/pull/3",
+  "ci_run": "https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42202424387",
+  "ci_conclusion": "success",
+  "local_node_major": 22,
+  "tests_passed": 77,
+  "typecheck_passed": true,
+  "local_build_passed": true,
+  "lovable_sandbox_build_passed": true,
+  "precache_assets_per_build": 23,
+  "generated_worker_verifier_passed": true,
+  "private_paths_verified": 8,
+  "network_only_html_navigation_paths_verified": 4,
+  "merge_performed": false,
+  "production_publish_performed": false,
+  "scope": "Static assets and generated route policy verification, including real client+SSR Vite regression; not physical iPhone/offline browser acceptance"
+}

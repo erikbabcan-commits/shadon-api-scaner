@@ -1,11 +1,10 @@
-import json
 import uuid
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import App, Finding, FindingSeverity, FindingSource, FindingStatus, User
-from app.services.reporting import csv_safe, generate_csv_report
+from app.services.reporting import csv_safe
 from app.services.sarif import build_sarif_report
 
 

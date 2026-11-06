@@ -1,0 +1,22 @@
+{
+  "observed_at_utc": "2026-11-06T13:12:28.440990+00:00",
+  "approved_plan_records": 6,
+  "removed_ids": [
+    "hfmddlcxia8riwbpndk7dc941",
+    "o1905ic0e07sqyfeu2jsfjv7e",
+    "1qskjcutgpwedo5fxkrnislhz",
+    "9jkvr75qvf3p6bych159h5d0u",
+    "owyqbw1kz2xv2eswv49q1q83y",
+    "iku9h5l4qwprkgglrisr195l0"
+  ],
+  "skipped": [],
+  "free_bytes_before": 503050240,
+  "free_bytes_after": 696479744,
+  "existing_running_containers_preserved": true,
+  "existing_image_and_volume_inventory_preserved": true,
+  "running_containers_before": 14,
+  "running_containers_after": 14,
+  "images_containers_volumes_pruned": false,
+  "authorization": "User explicitly approved these six exact context cache IDs",
+  "scope": "Six identified TLSX/HTTPX build upload/context records only; history, timestamps and eligibility revalidated. No image, container or volume pruning."
+}

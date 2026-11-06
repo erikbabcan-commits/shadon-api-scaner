@@ -7,7 +7,6 @@ Fully compatible with OASIS SARIF v2.1.0 and GitHub Code Scanning
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from typing import Any, Sequence
 

@@ -1,0 +1,34 @@
+{
+  "observed_at_utc": "2026-11-06T10:54:27.271697+00:00",
+  "source_runtime_commit": "8c78029551ab6695fcb964ed782a5b4dc8078c3d",
+  "ruff": {
+    "version": "0.17.4",
+    "rules": "F,E9",
+    "scope": "apps/api/app, tests, typings, both verification scripts",
+    "conclusion": "passed"
+  },
+  "mypy": {
+    "version": "2.4.1",
+    "python_version": "3.12",
+    "source_files": 50,
+    "strict": false,
+    "conclusion": "passed",
+    "cvss_typing": "Local explicit public CVSS3 interface verified against frozen3.6 upstream; no ignored-import or Any fallback"
+  },
+  "frontend": {
+    "head": "93a286f4463171f0e75e7e95ecc2448e8e663b16",
+    "ci": "https://github.com/youh4ck3dme/straz-security-beacon/actions/runs/42204858482",
+    "conclusion": "success",
+    "tests": 77,
+    "merged": false,
+    "published": false
+  },
+  "local_development": {
+    "private_sqlite_backup_created": true,
+    "additive_outbox_ddl_applied_transactionally": true,
+    "original_row_counts_preserved": true,
+    "alembic_revision_invented": false,
+    "api_and_frontend_readiness": true
+  },
+  "production_changes_performed": false
+}
