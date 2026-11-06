@@ -175,9 +175,11 @@ def build(release):
     storage = subprocess.run(['docker', 'info', '--format', '{{.DockerRootDir}}'],
                              capture_output=True, text=True, timeout=15)
     directory = storage.stdout.strip()
-    if (storage.returncode or not directory.startswith('/')
-        or shutil.disk_usage(directory).free < 512 * 1024 * 1024):
-        raise RuntimeError('Require at least 512 MiB free Docker storage before building')
+    if storage.returncode or not directory.startswith('/'):
+        raise RuntimeError('Docker storage is unavailable')
+    usage = shutil.disk_usage(directory)
+    if usage.free < max(1024 ** 3, usage.total // 20):
+        raise RuntimeError('Docker storage is critical; require at least 1 GiB and 5 percent free')
     payload = download(release)
     binary = verified_binary(payload, release)
     notice = verified_license(payload, release)

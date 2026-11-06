@@ -30,8 +30,11 @@ natívnej matice 450/450 na PG16 aj PG18.
 [Dôkaz buildov a runtime sond](evidence/scanner-pinned-image-builds-2026-11-06.json),
 [testovacia matica](evidence/backend-image-builder-matrix-2026-11-06.json).
 
-Builder pred sťahovaním vyžaduje aspoň 512 MiB voľného Docker storage a nič
-sám nečistí. Pred testom mal VPS približne 117 MiB: používateľ schválil presných
+Aktuálny builder pred sťahovaním vyžaduje aspoň 1 GiB a súčasne 5 %
+voľnej kapacity Docker storage, rovnako ako critical hranica kapacitného gate.
+Nič sám nečistí. Historický úspešný build nižšie používal pôvodnú hranicu
+512 MiB; nové pravidlo na dnešnom VPS ďalší build zablokuje.
+Cielených 17 regresií prešlo vrátane 664 MiB a 1,5 GiB na 40 GiB disku. Pred testom mal VPS približne 117 MiB: používateľ schválil presných
 45 neaktívnych/nesdieľaných cache ID. Odstránilo sa 38; sedem Docker ponechal
 kvôli závislostiam. Image a volumes aj bežiace služby zostali zachované.
 [Dôkaz schváleného čistenia](evidence/vps-approved-cache-cleanup-2026-11-06.json).

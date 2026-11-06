@@ -108,6 +108,7 @@ def test_builder_rejects_different_uncached_results(builder, monkeypatch):
     monkeypatch.setattr(builder.subprocess, 'run', lambda argv, **kw:
                         Storage() if argv[1] == 'info' else LocalBase())
     class Space:
+        total = 20 * 1024 ** 3
         free = 1024 * 1024 * 1024
     monkeypatch.setattr(builder.shutil, 'disk_usage', lambda path: Space())
     payload = zipped([('tlsx', elf(), stat.S_IFREG | 0o755),
@@ -119,7 +120,8 @@ def test_builder_rejects_different_uncached_results(builder, monkeypatch):
         builder.build(release(builder, payload))
 
 
-def test_low_disk_fails_before_release_download(builder, monkeypatch):
+@pytest.mark.parametrize('free', [117 * 1024 ** 2, 664 * 1024 ** 2, 1536 * 1024 ** 2])
+def test_low_disk_fails_before_release_download(builder, monkeypatch, free):
     class Reply:
         returncode = 0
         stdout = ''
@@ -128,13 +130,15 @@ def test_low_disk_fails_before_release_download(builder, monkeypatch):
         reply.stdout = '/var/lib/docker\n' if argv[1] == 'info' else 'linux amd64 sha256:' + 'a' * 64 + '\n'
         return reply
     class Space:
-        free = 117 * 1024 * 1024
+        total = 40 * 1024 ** 3
+    space = Space()
+    space.free = free
     monkeypatch.setattr(builder.platform, 'system', lambda: 'Linux')
     monkeypatch.setattr(builder.platform, 'machine', lambda: 'x86_64')
     monkeypatch.setattr(builder.subprocess, 'run', inspect)
-    monkeypatch.setattr(builder.shutil, 'disk_usage', lambda path: Space())
+    monkeypatch.setattr(builder.shutil, 'disk_usage', lambda path: space)
     monkeypatch.setattr(builder, 'download', lambda *args: pytest.fail('Must not download with low disk'))
-    with pytest.raises(RuntimeError, match='512 MiB'):
+    with pytest.raises(RuntimeError, match='storage is critical'):
         builder.build(builder.RELEASES['tlsx'])
 
 
