@@ -607,17 +607,6 @@ def _parse_trivy_json(out: str, err: str, code: int, source_key: str) -> list[To
     findings: list[ToolFinding] = []
     if code != 0 or not out.strip():
         raise RuntimeError("Trivy did not produce complete results")
-    if not out.strip():
-        if code not in (0, 1):
-            findings.append(
-                ToolFinding(
-                    title="trivy failed",
-                    detail=err or f"exit {code}",
-                    severity="low",
-                    fingerprint_key=f"trivy-fail|{source_key}",
-                )
-            )
-        return findings
     try:
         data = json.loads(out)
     except json.JSONDecodeError:
@@ -625,11 +614,9 @@ def _parse_trivy_json(out: str, err: str, code: int, source_key: str) -> list[To
     if not isinstance(data, dict) or "Results" not in data:
         raise RuntimeError("Incomplete Trivy results")
 
-    results = data.get("Results") if isinstance(data, dict) else None
-    if results is None and isinstance(data, list):
-        results = data
-    if not results:
-        return findings
+    results = data['Results']
+    if not isinstance(results, list):
+        raise RuntimeError("Invalid Trivy results collection")
 
     sev_map = {
         "UNKNOWN": "info",
@@ -639,11 +626,22 @@ def _parse_trivy_json(out: str, err: str, code: int, source_key: str) -> list[To
         "CRITICAL": "critical",
     }
     for result in results:
-        target = result.get("Target") or source_key
-        for vuln in result.get("Vulnerabilities") or []:
-            vid = vuln.get("VulnerabilityID") or vuln.get("PkgID") or "unknown"
-            sev = sev_map.get(str(vuln.get("Severity", "UNKNOWN")).upper(), "info")
-            pkg = vuln.get("PkgName") or ""
+        if (not isinstance(result, dict) or not isinstance(result.get('Target'), str)
+            or not result['Target']):
+            raise RuntimeError("Invalid Trivy target result")
+        target = result['Target']
+        vulnerabilities = result.get('Vulnerabilities', [])
+        if not isinstance(vulnerabilities, list):
+            raise RuntimeError("Invalid Trivy vulnerability collection")
+        for vuln in vulnerabilities:
+            if (not isinstance(vuln, dict)
+                or not isinstance(vuln.get('VulnerabilityID'), str) or not vuln['VulnerabilityID']
+                or not isinstance(vuln.get('PkgName'), str) or not vuln['PkgName']
+                or not isinstance(vuln.get('Severity'), str) or vuln['Severity'] not in sev_map):
+                raise RuntimeError("Invalid Trivy vulnerability")
+            vid = vuln['VulnerabilityID']
+            sev = sev_map[vuln['Severity']]
+            pkg = vuln['PkgName']
             title = f"{vid} in {pkg or target}"[:500]
             detail = json.dumps(
                 {
