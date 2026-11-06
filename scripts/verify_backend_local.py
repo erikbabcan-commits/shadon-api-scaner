@@ -39,6 +39,16 @@ def private_write(path, value):
         output.write(value)
 
 
+def source_hashes():
+    paths = [path for path in (ROOT / "apps/api").rglob("*.py")
+             if ".venv" not in path.parts and "__pycache__" not in path.parts]
+    paths.extend((ROOT / "apps/api/typings").rglob("*.pyi"))
+    paths.extend([ROOT / "apps/api/uv.lock", ROOT / "apps/api/pyproject.toml", ROOT / "deploy/staging.py",
+                  ROOT / "deploy/docker-compose.yml", ROOT / "deploy/docker-compose.staging.yml", Path(__file__)])
+    return [{"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            for path in sorted(set(paths))]
+
+
 def verify(pg_bin, redis_server, redis_cli, output, timeout):
     # A short temporary path also keeps PostgreSQL Unix sockets within OS limits.
     scratch = Path(tempfile.mkdtemp(prefix="straz-qa-"))
@@ -116,19 +126,17 @@ def main():
     if output.is_relative_to(ROOT):
         parser.error("Keep private test logs outside the repository")
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
+    tested_files = source_hashes()
     results = [verify(path.resolve(), args.redis_server, args.redis_cli, output, args.timeout)
                for path in args.postgres_bin]
-    paths = [path for path in (ROOT / "apps/api").rglob("*.py")
-             if ".venv" not in path.parts and "__pycache__" not in path.parts]
-    paths.extend([ROOT / "apps/api/uv.lock", ROOT / "deploy/staging.py",
-                  ROOT / "deploy/docker-compose.yml", ROOT / "deploy/docker-compose.staging.yml", Path(__file__)])
+    if source_hashes() != tested_files:
+        raise RuntimeError("Sources changed during verification; repeat against a stable tree")
     evidence = {"observed_at_utc": datetime.now(timezone.utc).isoformat(),
                 "source_commit": run(["git", "rev-parse", "HEAD"], cwd=ROOT).stdout.strip(),
                 "working_tree_had_changes": bool(run(["git", "status", "--porcelain"], cwd=ROOT).stdout.strip()),
                 "python": sys.version.split()[0], "results": results, "production_data_used": False,
                 "scope": "Native full suite: SQLite API units, real local PostgreSQL migrations/cutover, and Redis quota tests; not all API tests against PostgreSQL.",
-                "tested_files": [{"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-                                 for path in sorted(set(paths))]}
+                "tested_files": tested_files}
     private_write(output / "results.json", json.dumps(evidence, indent=2) + "\n")
     print("Disposable services stopped; evidence saved in the requested private directory")
 

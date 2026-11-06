@@ -32,3 +32,25 @@ zastavení PG uchová cluster namiesto zmazania živých súborov. Diagnostika z
 v privátnych logoch; konzola nezobrazuje výstup neúspešných subprocessov. JSON
 výsledok obsahuje verzie, source SHA, príznak zmien pracovného stromu a hashe
 testovaných súborov. Pred zverejnením prípadných logov vykonaj sanitizáciu.
+
+## Obnova schválenej súkromnej zálohy
+
+`scripts/verify_restore_local.py` prijíma existujúci privátny custom-format archív
+a jeho manifest (SHA-256, revízia a počty tabuliek z rovnakého zdrojového snapshotu).
+Obnoví ich výhradne do nového owner-only Unix socket clusteru s TCP vypnutým,
+porovná počty a hash pôvodných aplikačných riadkov, overí immutable audit, vykoná
+migrácie aktuálneho kódu a porovná pôvodné dáta znovu. Výstup obsahuje iba výsledky
+a hashe migračných súborov, nikdy počty/obsah produkčných riadkov alebo credentials.
+
+```bash
+/tmp/straz-verification-venv/bin/python scripts/verify_restore_local.py \
+  --archive /secure/backup.dump \
+  --manifest /secure/backup.manifest.json \
+  --postgres-bin /opt/homebrew/opt/postgresql@18/bin \
+  --output /secure/new-restore-proof.json
+```
+
+Ide o citlivú kópiu údajov: použiť iba schválený dôveryhodný archív a privátne
+úložisko. Nespúšťa API, worker, notifikácie ani iné integrácie. Zdrojovú DB vôbec
+nekontaktuje. Svoj cluster zastaví a pracovné dáta odstráni; archív ostáva zachovaný.
+Táto skúška nepotvrdzuje produkčný upgrade ani automatickú backup/retention politiku.

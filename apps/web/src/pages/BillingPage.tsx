@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
+const scheduleLabels: Record<string, string> = {
+  weekly: "Plánované skeny raz týždenne",
+  daily: "Plánované skeny raz denne",
+  hourly: "Plánované skeny každú hodinu",
+};
+
 export function BillingPage() {
   const [plans, setPlans] = useState<Record<string, any>>({});
   const [usage, setUsage] = useState<any>(null);
@@ -172,7 +178,7 @@ export function BillingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-sky-400">✓</span>
-                    Automatický Heartbeat podľa nastavenia prevádzky
+                    {scheduleLabels[p.cron_schedule] || "Manuálne spúšťanie skenov"}
                   </li>
                   <li className="flex items-center gap-2">
                     <span className={p.white_label ? "text-sky-400" : "text-slate-600"}>
@@ -181,6 +187,11 @@ export function BillingPage() {
                     White-Label PDF Reporty
                   </li>
                 </ul>
+                {scheduleLabels[p.cron_schedule] && (
+                  <p className="mt-3 text-xs text-slate-400">
+                    Podľa zapnutých dostupných profilov a zostávajúcej kvóty. Časy UTC.
+                  </p>
+                )}
               </div>
 
               <div className="mt-8">
