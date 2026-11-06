@@ -1,0 +1,17 @@
+{
+  "verified_at": "2026-11-06T11:42:50.421681+00:00",
+  "scope": "Real sandbox process joins verified policy guard; no external scan or application profile activation",
+  "checks": {
+    "verified_policy_guard_joined": true,
+    "scanner_and_guard_same_network_namespace": true,
+    "owned_containers_removed": true,
+    "existing_containers_still_running": true
+  },
+  "source_sha256": {
+    "deploy/scanner_network.py": "b6391898bec1eed1cfe65b07d9efa7b10190ecc4a1d1919e3e0a20037a4b08b0",
+    "deploy/scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "deploy/scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "deploy/scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2",
+    "deploy/scanner_process.py": "6bf3caeccc871834275c5e02249a3a19e80943991754bc00c75b9963ed9c223b"
+  }
+}

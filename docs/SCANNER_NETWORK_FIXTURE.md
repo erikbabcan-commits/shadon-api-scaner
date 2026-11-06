@@ -1,5 +1,14 @@
 # Sieťová fixture pre budúci scanner runner
 
+`deploy/scanner_network.py` spustí dôveryhodný profilový adaptér až v guard
+namespace s overenou politikou. Používa nemenné lokálne images, limitované
+rúry, timeout najviac 900 s, non-root/read-only sandbox bez capabilities a
+bez host mountov. Vlastný scanner kontajner odstráni pred odstránením guardu.
+Reálny test na VPS porovnal identitu network namespace procesu a guardu,
+overil cleanup a zachovanie pôvodných bežiacich kontajnerov.
+[Dôkaz a hashe zdrojov](evidence/scanner-network-live-2026-11-06.json).
+Tento test nespúšťal externý scan a neaktivuje aplikačné profily.
+
 Offline procesná vrstva je v `deploy/scanner_process.py` a
 `deploy/scanner_offline.py`: vstup najviac 1 MiB, spoločný limit stdout/stderr,
 deadline aj pri zdedených alebo zavretých rúrach, ukončenie procesnej skupiny
