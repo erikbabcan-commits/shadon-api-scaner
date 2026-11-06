@@ -1,8 +1,12 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
-COPY . .
+COPY package.json package-lock.json ./
+RUN npm ci
+ARG VITE_API_URL=""
+ENV VITE_API_URL=${VITE_API_URL}
+COPY index.html tsconfig.json vite.config.ts ./
+COPY src ./src
+COPY public ./public
 RUN npm run build
 
 FROM alpine:3.20

@@ -24,7 +24,9 @@ def upgrade() -> None:
             sa.Column(
                 "organization_id",
                 sa.CHAR(36),
-                sa.ForeignKey("organizations.id", ondelete="CASCADE"),
+                sa.ForeignKey(
+                    "organizations.id", name="audit_events_organization_id_fkey", ondelete="CASCADE"
+                ),
                 nullable=True,
             )
         )

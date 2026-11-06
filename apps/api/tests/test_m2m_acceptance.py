@@ -37,8 +37,8 @@ async def test_docker_compose_and_staging_env_verification():
     assert "straz-api-production" not in compose_content
 
     # 3. Dedicated staging env template verification
-    staging_env_path = Path(__file__).resolve().parents[3] / "deploy" / ".env.staging.example"
-    assert staging_env_path.exists(), ".env.staging.example must exist"
+    staging_env_path = Path(__file__).resolve().parents[3] / "deploy" / ".env.example"
+    assert staging_env_path.exists(), "deploy/.env.example must exist"
     staging_env_content = staging_env_path.read_text()
     assert "STRAZ_ENV=staging" in staging_env_content
     assert "STRIPE_SECRET_KEY=" in staging_env_content  # Blank / disabled
