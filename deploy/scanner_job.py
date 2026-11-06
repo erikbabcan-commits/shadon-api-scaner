@@ -11,6 +11,7 @@ import socket
 import uuid
 
 import scanner_gitleaks
+import scanner_git
 import scanner_httpx
 import scanner_tlsx
 from scanner_policy import compile_policy
@@ -42,14 +43,23 @@ def execute(job, images):
     profile = job.get('profile')
     if profile not in ('tls', 'http', 'gitleaks'):
         raise ValueError('Unsupported isolated profile')
-    expected = {'version', 'job_id', 'profile', 'source_base64' if profile == 'gitleaks' else 'target'}
+    repository = profile == 'gitleaks' and 'repository_url' in job
+    payload_field = ('repository_url' if repository else 'source_base64') if profile == 'gitleaks' else 'target'
+    expected = {'version', 'job_id', 'profile', payload_field}
     if set(job) != expected:
         raise ValueError('Unexpected scanner job fields')
-    keys = (profile,) if profile == 'gitleaks' else ('guard', profile)
+    keys = ('guard', 'git', 'gitleaks') if repository else ((profile,) if profile == 'gitleaks' else ('guard', profile))
     if (not isinstance(images, dict) or any(not isinstance(images.get(key), str)
         or not re.fullmatch(r'sha256:[a-f0-9]{64}', images[key]) for key in keys)):
         raise ValueError('Missing approved immutable scanner image')
-    if profile == 'gitleaks':
+    if repository:
+        host, port = scanner_git.repository_endpoint(job['repository_url'])
+        addresses = resolve_target(host, port)
+        snapshot = scanner_git.clone_archive(images['guard'], images['git'],
+                                             job['repository_url'], addresses[0])
+        result = {'scope': 'repository_head', 'commit': snapshot['commit'],
+                  'findings': scanner_gitleaks.scan_archive(images['gitleaks'], snapshot['archive'])}
+    elif profile == 'gitleaks':
         encoded = job['source_base64']
         if not isinstance(encoded, str) or len(encoded) > 1398104:
             raise ValueError('Invalid scanner source input')

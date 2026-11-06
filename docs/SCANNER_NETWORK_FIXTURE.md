@@ -11,7 +11,16 @@ zachytil token aj napriek repo allowlistu a vrátil iba redigované metadáta
 s relatívnou cestou súboru.
 [Dôkaz](evidence/scanner-archive-live-2026-11-06.json).
 Väčšie archívy a repozitáre s odkazmi zlyhajú explicitne; nevracajú čistý sken.
-Priame Git → archive prepojenie a plná Git história zostávajú otvorené.
+Priame Git → archive → offline Gitleaks prepojenie už prešlo na reálnom
+verejnom repozitári a následne cez nové CLI vrátane receipt replay.
+Gitleaks job môže namiesto `source_base64` prijať `repository_url` (nie oboje).
+Výsledok explicitne uvádza `scope=repository_head` a nemenný commit SHA.
+Git export používa prázdny worktree, aby `.gitattributes` export-ignore ani
+export-subst nezmenili skenovaný snapshot. Regresia vytvára reálny lokálny Git
+repozitár s export-ignore a overuje prítomnosť skrytého súboru v tar prúde.
+[Reálny dôkaz celého toku](evidence/scanner-repository-chain-2026-11-06.json).
+Plná história, súkromná repo autentifikácia, veľké zdroje a odkazy zostávajú
+otvorené. Toto nie je produkčná aktivácia profilu.
 
 Git acquisition command builder `deploy/scanner_git.py` prijíma iba HTTPS URL
 bez credentials/query/fragmentu, explicitnú verejnú IP a pevný sandbox cieľ.
@@ -20,8 +29,9 @@ credential helperov a všetkých protokolov okrem HTTPS. Clone je bare a depth 1
 bez submodulov, checkoutu alebo vykonávania repozitárového kódu.
 Skutočný clone vlastného verejného repozitára cez Git 2.49.1 na VPS prešiel.
 [Dôkaz a rozsah](evidence/scanner-git-live-2026-11-06.json).
-Zdroj zatiaľ neopúšťa dočasný kontajner. Bezpečný handoff offline skenerom,
-väčšie repozitáre, plná história a reprodukovateľný Git image zostávajú otvorené.
+Zdroj opúšťa clone kontajner iba ako validovaný obmedzený tar prúd do nového
+offline kontajnera. Väčšie repozitáre, plná história a reprodukovateľný Git
+image zostávajú otvorené.
 
 Jednorazové rozhranie supervisora:
 `python3 deploy/scanner_job_cli.py --images-file <operátorom-spravované-images.json> --state-dir <súkromný-spoločný-stav>`.

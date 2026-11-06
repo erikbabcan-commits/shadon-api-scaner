@@ -58,3 +58,21 @@ def test_source_job_returns_only_adapter_metadata(dispatcher, monkeypatch):
     result = dispatcher.execute(envelope, {'gitleaks': 'sha256:' + 'a' * 64})
     assert result['job_id'] == envelope['job_id'] and result['observations_complete'] is True
     assert 'source_base64' not in result and result['result'] == {'findings': []}
+
+
+def test_repository_job_chains_pinned_acquisition_and_offline_scan(dispatcher, monkeypatch):
+    envelope = {'version': 1, 'job_id': str(uuid.uuid4()), 'profile': 'gitleaks',
+                'repository_url': 'https://authorized.example/owner/repo.git'}
+    monkeypatch.setattr(dispatcher, 'resolve_target', lambda *args: ['1.1.1.1'])
+    def clone(guard, git, url, address):
+        assert address == '1.1.1.1' and url == envelope['repository_url']
+        return {'commit': 'a' * 40, 'archive': b'synthetic validated archive'}
+    monkeypatch.setattr(dispatcher.scanner_git, 'clone_archive', clone)
+    def scan(image, archive):
+        assert archive == b'synthetic validated archive'
+        return []
+    monkeypatch.setattr(dispatcher.scanner_gitleaks, 'scan_archive', scan)
+    images = {key: 'sha256:' + 'a' * 64 for key in ('guard', 'git', 'gitleaks')}
+    result = dispatcher.execute(envelope, images)
+    assert result['observations_complete'] is True
+    assert result['result'] == {'scope': 'repository_head', 'commit': 'a' * 40, 'findings': []}
