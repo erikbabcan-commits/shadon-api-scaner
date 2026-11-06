@@ -8,13 +8,15 @@ potvrdené novým produkčným deploymentom.
 Východiskový lokálny HEAD: `c5db6aeb9ae82839444076eeebd45c5ca5f6bc9b`, vetva
 `feat/straz-m2m-runs-read`. Opravy nad týmto commitom sú pripravené na review vo vetve
 `codex/production-readiness-20261106`; autoritatívny výsledný commit určuje HEAD pull requestu.
+Kód na `5a6186fb5a801b571339f26eb1997766bfb50ea3` je v
+[draft PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/6).
 
 ## Lokálne overené tímom
 
 | Kontrola / zmena | Výsledok a rozsah |
 |---|---|
 | SQLite migrácie | Opravené názvy FK constraintov v migráciách 002 a 007; doplnené regresné testy. |
-| Backend | Kompletná sada s izolovaným PostgreSQL **18.6** a Redisom: **132 passed, 0 skipped**. PostgreSQL 16 pre aktuálne zmeny zatiaľ neoverený. |
+| Backend | Python **3.12.13** s izolovaným PostgreSQL **16.15** aj **18.6**, zakaždým s vlastným Redisom: v každej vetve **132 passed, 0 skipped**. Overené na `5a6186f`, lokálne macOS ARM64; nejde o cloud Linux CI. |
 | Izolácia testov | Testovacie služby po kontrolách zastavené; lokálne vývojové API a Redis zostali zdravé. Produkčná databáza sa nepoužila. |
 | M2M acceptance | **4 passed** po aktualizácii cesty stagingovej šablóny. |
 | Frontend | Po `npm ci`: **19 testov prešlo**, TypeScript a Vite/PWA build skončili s exit 0. |
@@ -44,6 +46,11 @@ tajomstiev ani čistotu všetkých minulých commitov.
   ani neoverené overrides cez major verzie.
 - Zostavenie finálnych kontajnerových image a ich runtime kontrola nie sú týmto
   záznamom potvrdené.
+- Vercel konektor potvrdil dve **READY preview** nasadenia presného commitu `5a6186f`:
+  [shadon-api-scaner](https://shadon-api-scaner-21aq18ywc-somnajviac.vercel.app)
+  a [web](https://web-5vbuxvav8-somnajviac.vercel.app). Majú `target: null`, teda nejde
+  o produkčný deploy. Verejné GET vracajú 302 na Vercel SSO; aplikačné správanie
+  za Deployment Protection tým ešte nebolo overené. Ochrana ani zdieľanie sa nemenili.
 
 ## Lovable — hlásenie agenta, zatiaľ bez nezávislej akceptácie
 
@@ -81,6 +88,9 @@ Produkčný login, skeny a notifikácie sa počas týchto read-only kontrol nevy
 - Otvorený PR **#5** blokuje billing: „The job was not started because your
   account is locked due to a billing issue.“ Nie je to zlyhanie aplikačného testu
   ani úspešne vykonaná kontrola.
+- Rovnakú billing annotation priamo potvrdil nový
+  [CI beh PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/runs/42141257570)
+  na `5a6186f`: secret gate nemal vykonané kroky, backend a frontend boli preskočené.
 - Railway CLI vracia `Unauthorized` a dashboard zobrazuje Login. Aktuálne
   nasadené SHA API/workera, commit pin, premenné a prevádzkové dôkazy preto
   neboli potvrdené.
