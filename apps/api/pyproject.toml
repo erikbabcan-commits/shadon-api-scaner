@@ -51,3 +51,6 @@ pythonpath = ["."]
 filterwarnings = [
   "ignore::DeprecationWarning",
 ]
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/typings"

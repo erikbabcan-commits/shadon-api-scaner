@@ -178,7 +178,7 @@ async def _run_cmd(args: list[str], timeout: float = 120.0) -> tuple[int, str, s
         stderr=asyncio.subprocess.PIPE,
         close_fds=True,
         env={key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR") if key in os.environ},
-        **({"start_new_session": True} if os.name == "posix" else {}),
+        start_new_session=os.name == "posix",
     ))
     try:
         async with asyncio.timeout(timeout):
