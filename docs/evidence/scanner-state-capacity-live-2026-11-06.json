@@ -1,0 +1,9 @@
+{
+  "observed_at_utc": "2026-11-06T13:17:20.690659+00:00",
+  "state_source_sha256": "39b275c6c979dae776dc0358cfa3f6196e25c2167ab8786467a462670609c652",
+  "real_selected_vps_filesystem_rejected": true,
+  "scanner_and_docker_calls": 0,
+  "new_receipt_written": false,
+  "scope": "Real selected-host filesystem admission check with fail-on-call scanner/Docker stubs, in a temporary private directory; no app deployment or scanner execution.",
+  "temporary_fixture_removed": true
+}

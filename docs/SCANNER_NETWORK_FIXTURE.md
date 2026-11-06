@@ -152,6 +152,10 @@ nič automaticky nemaže. Už dokončený identický replay prebehne aj pri níz
 priestore alebo limite. Regresie overujú odmietnutie pred execute/zápisom
 nového receipt a zachovanie existujúcich bajtov. Toto nie je nasadená retencia,
 rezervácia filesystemu proti cudzím procesom ani záruka pri náhlom zaplnení disku.
+Jednorazová súkromná fixture na vybranom VPS potvrdila critical odmietnutie
+na reálnom filesysteme pred volaním Docker/scannera a bez nového receipt.
+Fixture bola odstránená; nejde o nainštalovanú službu ani produkčný job.
+[Dôkaz](evidence/scanner-state-capacity-live-2026-11-06.json).
 
 `deploy/scanner_job.py` poskytuje verzované dôveryhodné job rozhranie pre
 Gitleaks stdin/repository HEAD, TLS, obmedzené HTTP a TCP connect pozorovanie. Identita je kanonické UUID,
