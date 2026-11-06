@@ -1,5 +1,15 @@
 # Sieťová fixture pre budúci scanner runner
 
+Git acquisition command builder `deploy/scanner_git.py` prijíma iba HTTPS URL
+bez credentials/query/fragmentu, explicitnú verejnú IP a pevný sandbox cieľ.
+Používa `http.curloptResolve`, TLS verification, zákaz redirectov, hooks,
+credential helperov a všetkých protokolov okrem HTTPS. Clone je bare a depth 1,
+bez submodulov, checkoutu alebo vykonávania repozitárového kódu.
+Skutočný clone vlastného verejného repozitára cez Git 2.49.1 na VPS prešiel.
+[Dôkaz a rozsah](evidence/scanner-git-live-2026-11-06.json).
+Zdroj zatiaľ neopúšťa dočasný kontajner. Bezpečný handoff offline skenerom,
+väčšie repozitáre, plná história a reprodukovateľný Git image zostávajú otvorené.
+
 Jednorazové rozhranie supervisora:
 `python3 deploy/scanner_job_cli.py --images-file <operátorom-spravované-images.json> --state-dir <súkromný-spoločný-stav>`.
 Prijme jeden JSON zo stdin (max 2 MiB), odmietne duplicitné polia a vypíše
