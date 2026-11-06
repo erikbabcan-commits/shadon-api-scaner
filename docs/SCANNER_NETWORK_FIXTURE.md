@@ -1,5 +1,48 @@
 # Sieťová fixture pre budúci scanner runner
 
+## Pripnuté buildy TLSX a HTTPX
+
+`python3 scripts/build_scanner_projectdiscovery.py tlsx` alebo `httpx` je
+operátorský build pre existujúci Linux AMD64 host. Prijíma iba tieto dve voľby;
+oficiálny ZIP overí pripnutým SHA-256 ešte pred čítaním členov. Vyberá presný
+binárny a licenčný súbor, odmieta duplicity, odkazy, zlú ELF architektúru alebo
+dynamický loader. Obmedzuje veľkosť archívu/binárky a používa už lokálny,
+digestom pripnutý BusyBox. Build nemá RUN, má `--network=none --pull=false`,
+non-root používateľa a HOME v `/tmp`; nespúšťa aplikačné joby.
+
+Kontrolný red beh ukázal, že samotný SOURCE_DATE_EPOCH a normalizovaný vstupný
+tar nestačia: COPY vytvoril adresáre s rozdielnymi časmi vo vrstve. Aktuálny
+build pridáva vlastný obmedzený filesystem tar s explicitnými časmi, UID/GID
+a režimami súborov aj adresárov. Obsahuje výhradne overenú binárku a oficiálnu
+licenciu; upstream archív sa na hostiteľovi nerozbaľuje.
+
+Na lokálnom OrbStack aj vybranom VPS prešli dva `--no-cache` buildy každého
+nástroja; pozorované výsledné image ID aj context SHA sa zhodujú medzi oboma
+prostrediami. Nejde o záruku pre každú budúcu verziu BuildKit. Nové image:
+
+- TLSX 1.1.9: `sha256:48867cc2dd14934d334fa3e798e320e071eff6d8858b27f7376ded5fc683f962`.
+- HTTPX 1.6.10: `sha256:e1b267066bd0ecd448fce4897b28be837955c9db2199eaeb652e6ca6ec867105`.
+
+Obe sa spustili offline/read-only/non-root. Na VPS navyše cez existujúci presný
+IP/TCP guard prešla TLS sonda vlastného backendu a HTTP readiness 200.
+Všetkých 14 pôvodných kontajnerov zostalo bežať. Nových 15 regresií je súčasťou
+natívnej matice 450/450 na PG16 aj PG18.
+[Dôkaz buildov a runtime sond](evidence/scanner-pinned-image-builds-2026-11-06.json),
+[testovacia matica](evidence/backend-image-builder-matrix-2026-11-06.json).
+
+Builder pred sťahovaním vyžaduje aspoň 512 MiB voľného Docker storage a nič
+sám nečistí. Pred testom mal VPS približne 117 MiB: používateľ schválil presných
+45 neaktívnych/nesdieľaných cache ID. Odstránilo sa 38; sedem Docker ponechal
+kvôli závislostiam. Image a volumes aj bežiace služby zostali zachované.
+[Dôkaz schváleného čistenia](evidence/vps-approved-cache-cleanup-2026-11-06.json).
+Po nových buildoch zostalo približne 479 MiB, čo je prevádzkový nedostatok;
+upratanie šiestich nových upload kontextov čaká na samostatné schválenie.
+Tento krok neaktivuje aplikačné CLI profily a nedokazuje bezpečnosť všetkých
+závislostí nástrojov. Reprodukovateľný Git/Naabu/Trivy build, DB refresh,
+kapacitný monitoring a ďalšie integračné hranice zostávajú otvorené.
+
+## Predchádzajúce adaptačné a izolačné dôkazy
+
 `trivy_fs` teraz používa kontrolovaný Git HEAD archív a nový offline Trivy
 0.74.0 kontajner s vopred zabudovanou reálnou Aqua vulnerability DB. Runtime
 má network none, explicitný schválený YAML config, vypnuté repo ignore pravidlá,

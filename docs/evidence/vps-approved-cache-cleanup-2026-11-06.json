@@ -1,0 +1,16 @@
+{
+  "observed_at_utc": "2026-11-06T13:00:15.933972+00:00",
+  "authorization": "User explicitly approved the exact 45-record inactive/unshared cache cleanup plan",
+  "approved_plan_sha256": "5bcf1a3717b2f87db1a5fd3fc079ee82876ff3f0d77de37cad99f1facd5df5a5",
+  "approved_records": 45,
+  "removed_records": 38,
+  "remaining_builder_retained_records": 7,
+  "free_bytes_before": 122540032,
+  "free_bytes_after": 912519168,
+  "existing_running_containers_preserved": true,
+  "running_containers_before": 14,
+  "running_containers_after": 14,
+  "existing_image_and_volume_inventory_preserved": true,
+  "images_containers_volumes_pruned": false,
+  "scope": "Exact approved cache IDs only, eligibility rechecked before every prune; retained dependencies not forced. No service restart, image/volume deletion, secret rotation, app deployment, public DB port or paid feature change."
+}

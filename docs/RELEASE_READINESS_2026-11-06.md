@@ -36,12 +36,12 @@ dependency targety bez nálezov v danej DB; nejde o dôkaz neprítomnosti všetk
 zraniteľností, OS balíkov kontajnera alebo produkčného runtime.
 [Dôkaz a hashe lockfiles](evidence/release-dependency-scan-2026-11-06.json).
 
-## Aktuálne natívne overenie a2b4006 a samostatný supervisor
+## Aktuálne natívne overenie c084f6b a samostatný supervisor
 
-- **435 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
+- **450 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
   Python 3.12.13 a vlastnom Redis. Testovaný strom bol čistý; fingerprint teraz
   zahŕňa aj supervisor moduly a scanner verifikačné/build skripty.
-  [Dôkaz a presné hashe](evidence/backend-cancellation-matrix-2026-11-06.json).
+  [Dôkaz a presné hashe](evidence/backend-image-builder-matrix-2026-11-06.json).
   Rozsah zostáva SQLite API units + reálne PG/Redis/TLS/procesné/Git fixtures,
   nie všetky API scenáre na PostgreSQL.
 - Nových päť regresií overuje rollback čiastočných pozorovaní pri zrušení,
@@ -56,6 +56,18 @@ zraniteľností, OS balíkov kontajnera alebo produkčného runtime.
   IP a SNI, HTTP s Host/SNI a readiness 200, aj Git → validovaný tar → nový
   offline Gitleaks kontajner. Job CLI a durable replay boli spustené ako nové
   procesy. [Presné dôkazy a hranice](SCANNER_NETWORK_FIXTURE.md).
+- Nový operátorský builder pripína oficiálne TLSX/HTTPX ZIPy, binárky, licencie
+  a lokálny base digest. Dva skutočné `--no-cache` buildy každého nástroja
+  prešli lokálne aj na VPS so zhodnými image IDs medzi týmito dvoma prostrediami;
+  nové image vykonali izolované vlastné TLS/readiness sondy. Nejde o univerzálnu
+  cross-BuildKit záruku ani aktiváciu profilov.
+  [Dôkaz](evidence/scanner-pinned-image-builds-2026-11-06.json).
+- Na VPS sa po schválení odstránilo 38 zo 45 konkrétnych neaktívnych,
+  nesdieľaných cache záznamov; závislosti siedmich sa nevynucovali. Všetkých
+  14 pôvodných kontajnerov, image a volumes zostalo zachovaných. Po ďalších
+  buildoch je voľné miesto opäť nízke; čistenie šiestich nových kontextov čaká
+  na nový súhlas. Trvalá kapacitná politika a monitoring sú stále otvorené.
+  [Dôkaz čistenia](evidence/vps-approved-cache-cleanup-2026-11-06.json).
 - Všetkých osem aplikačných CLI profilov zostáva zablokovaných. Ešte chýba
   autentifikovaný transport a queue/tenant admission integrácia, zvyšné adaptéry,
   úplná funkčná akceptácia, reprodukovateľné images a retencia/rekonciliácia
