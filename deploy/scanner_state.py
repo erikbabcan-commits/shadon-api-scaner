@@ -9,12 +9,27 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import tempfile
 import uuid
 
 from scanner_guard import docker
 from scanner_job import execute
+
+MAX_STATE_ENTRIES = 10000
+
+
+def check_capacity(root):
+    usage = shutil.disk_usage(root)
+    # Reserve enough space for bounded result + atomic replacement as well as
+    # the host's critical floor. This is admission, never automatic retention.
+    if usage.free < max(1024 ** 3, usage.total // 20) + 8 * 1024 ** 2:
+        raise RuntimeError('Scanner state storage is critical')
+    with os.scandir(root) as entries:
+        for count, _ in enumerate(entries, 1):
+            if count >= MAX_STATE_ENTRIES:
+                raise RuntimeError('Scanner state requires operator retention')
 
 
 def check_private(info):
@@ -76,6 +91,7 @@ def execute_once(job, images, state_dir):
             if cached['status'] != 'complete':
                 raise RuntimeError('Scanner job requires operator reconciliation')
             return cached['response']
+        check_capacity(root)
         # A previous crashed client may have left daemon-owned containers. Do
         # not release more work merely because its OS file lock disappeared.
         for label in ('straz.guard', 'straz.offline', 'straz.network'):

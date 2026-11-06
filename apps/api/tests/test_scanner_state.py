@@ -90,3 +90,32 @@ def test_image_change_does_not_silently_reexecute_same_job(state, monkeypatch, t
     state.execute_once(envelope, {'image': 'old'}, tmp_path)
     with pytest.raises(RuntimeError, match='different input'):
         state.execute_once(envelope, {'image': 'new'}, tmp_path)
+
+
+def test_low_storage_blocks_new_job_but_preserves_replay(state, monkeypatch, tmp_path):
+    monkeypatch.setattr(state, 'execute', lambda *args: {'complete': True})
+    envelope = job()
+    state.execute_once(envelope, {}, tmp_path)
+    class Space:
+        total = 40 * 1024 ** 3
+        free = 664 * 1024 ** 2
+    monkeypatch.setattr(state.shutil, 'disk_usage', lambda path: Space())
+    monkeypatch.setattr(state, 'execute', lambda *args: pytest.fail('Low storage execution'))
+    assert state.execute_once(envelope, {}, tmp_path) == {'complete': True}
+    fresh = job()
+    with pytest.raises(RuntimeError, match='storage is critical'):
+        state.execute_once(fresh, {}, tmp_path)
+    assert not (tmp_path / (fresh['job_id'] + '.json')).exists()
+
+
+def test_retention_limit_preserves_receipts_and_replay(state, monkeypatch, tmp_path):
+    monkeypatch.setattr(state, 'execute', lambda *args: {})
+    envelope = job()
+    state.execute_once(envelope, {}, tmp_path)
+    original = (tmp_path / (envelope['job_id'] + '.json')).read_bytes()
+    monkeypatch.setattr(state, 'MAX_STATE_ENTRIES', 2)
+    monkeypatch.setattr(state, 'execute', lambda *args: pytest.fail('Retention limit execution'))
+    assert state.execute_once(envelope, {}, tmp_path) == {}
+    with pytest.raises(RuntimeError, match='operator retention'):
+        state.execute_once(job(), {}, tmp_path)
+    assert (tmp_path / (envelope['job_id'] + '.json')).read_bytes() == original

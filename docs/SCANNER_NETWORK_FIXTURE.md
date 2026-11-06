@@ -144,6 +144,15 @@ Nie je to automatická crash recovery ani globálny lease existujúceho ARQ
 workeru. Retencia receipts, disk monitoring a riadená rekonciliácia zostávajú
 potrebné pred produkčným zapojením. Všetky procesy musia používať ten istý stav.
 
+Nový admission guard pod existujúcim flock pred vznikom nového receipt vyžaduje
+na stavovom filesysteme aspoň maximum 1 GiB/5 % plus 8 MiB rezervu na výsledok
+a jeho atomickú náhradu. Pri 10 000 položkách stavového adresára odmietne nové
+úlohy a vyžiada operátorskú retenciu. Počíta aj neznáme a dočasné položky,
+nič automaticky nemaže. Už dokončený identický replay prebehne aj pri nízkom
+priestore alebo limite. Regresie overujú odmietnutie pred execute/zápisom
+nového receipt a zachovanie existujúcich bajtov. Toto nie je nasadená retencia,
+rezervácia filesystemu proti cudzím procesom ani záruka pri náhlom zaplnení disku.
+
 `deploy/scanner_job.py` poskytuje verzované dôveryhodné job rozhranie pre
 Gitleaks stdin/repository HEAD, TLS, obmedzené HTTP a TCP connect pozorovanie. Identita je kanonické UUID,
 job nesmie vyberať príkaz, image ani env. Images sú pevná konfigurácia operátora.
