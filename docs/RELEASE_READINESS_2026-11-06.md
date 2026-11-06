@@ -6,12 +6,33 @@ testy, historické CI a hlásenie Lovable sú odlišné dôkazy. Lovable fronten
 publikovaný a verejné API prepojenie je overené; nové backendové opravy zatiaľ
 nie sú potvrdené produkčným deploymentom.
 
-## Aktuálne natívne overenie 42d3ced a samostatný supervisor
+## Zlúčený frontend a aktuálna bezpečnostná oprava
 
-- **412 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
+Frontend PR #5 (CI URL + produkčné hlavičky) a PR #3 (audit bez vymyslenej
+známky + opravený PWA client output) sú zlúčené bežnými merge commitmi.
+Overený `main` je `2ad7b42200f8a64b0fd23b03844eafca17a9c159`; jeho strom je
+identický s testovaným kandidátom `828c463`. CI kandidáta prešlo vrátane
+produkčného dependency auditu, 85 testov, TypeScriptu, buildu, PWA aj SSR gate.
+Normálny aj Lovable build majú 27 statických precache súborov; aktuálne robotové
+ikony ostali zachované. Text nepodložených scheduler intervalov bol odstránený.
+Lovable editor už načítal merge PR #3, ale hlási nepublikované zmeny.
+Toto nie je dôkaz novej verzie na publikovanej doméne ani fyzický iPhone test.
+[Dôkaz synchronizácie a CI](evidence/frontend-merged-readiness-2026-11-06.json).
+
+Backend má opravený dnspython: minimum 2.9.0, lock 2.9.2 z verejného PyPI,
+bez zmien ostatných verzií. Upstream advisory GHSA-45c3-73f7-pv4m označuje
+verzie pod 2.9.0 za zraniteľné. Frozen test prostredie skutočne používalo 2.9.2.
+Offline Trivy sken presného release snapshotu `77989e5` analyzoval 2 podporované
+dependency targety bez nálezov v danej DB; nejde o dôkaz neprítomnosti všetkých
+zraniteľností, OS balíkov kontajnera alebo produkčného runtime.
+[Dôkaz a hashe lockfiles](evidence/release-dependency-scan-2026-11-06.json).
+
+## Aktuálne natívne overenie 77989e5 a samostatný supervisor
+
+- **430 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
   Python 3.12.13 a vlastnom Redis. Testovaný strom bol čistý; fingerprint teraz
   zahŕňa aj supervisor moduly a scanner verifikačné/build skripty.
-  [Dôkaz a presné hashe](evidence/backend-supervisor-matrix-2026-11-06.json).
+  [Dôkaz a presné hashe](evidence/backend-dnspython-matrix-2026-11-06.json).
   Rozsah zostáva SQLite API units + reálne PG/Redis/TLS/procesné/Git fixtures,
   nie všetky API scenáre na PostgreSQL.
 - Ruff F/E9, default Mypy pre 50 aplikačných súborov a secret scan sledovaného
