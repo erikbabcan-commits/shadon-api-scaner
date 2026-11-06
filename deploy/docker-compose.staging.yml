@@ -1,4 +1,4 @@
-# Compose >= 2.24.4; combine with docker-compose.yml as documented in STAGING.md.
+# Compose >= 2.30.0; use staging.py as documented in STAGING.md.
 name: straz-staging
 
 services:
@@ -8,9 +8,11 @@ services:
 
   api:
     env_file: !override
-      - ../.env.staging
+      - path: ../.env.staging
+        format: raw
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set the isolated staging database URL}
+      DATABASE_URL: !reset null
+      REDIS_URL: !reset null
       STRAZ_ENV: staging
       STRAZ_ADMIN_EMAIL: ${STRAZ_ADMIN_EMAIL:?Set a staging administrator email}
       STRAZ_ADMIN_PASSWORD: ${STRAZ_ADMIN_PASSWORD:?Set a unique staging administrator password}
@@ -18,9 +20,11 @@ services:
 
   worker:
     env_file: !override
-      - ../.env.staging
+      - path: ../.env.staging
+        format: raw
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set the isolated staging database URL}
+      DATABASE_URL: !reset null
+      REDIS_URL: !reset null
       STRAZ_ENV: staging
 
   caddy:

@@ -19,6 +19,10 @@ Toto PR nepridáva backfill, novú schému ani produkčný dátový zápis.
 
 ## Záloha a izolovaný restore
 
+Koordináciu API/workera pri zmene head 008 → 009 a návrat cez novú databázu opisuje
+[cutover/rollback postup](MIGRATION_008_009_CUTOVER.md). Jeho syntetická skúška
+nenahrádza nasledujúcu kontrolu reálnej produkčnej zálohy.
+
 1. V Railway overiť existujúci Postgres backup/PITR plán a podporu služby/plánu.
    Zaznamenať ID poslednej úspešnej zálohy, čas, rozsah, privátny prístup a retenciu.
    Navrhované minimum na schválenie: denná záloha, 7 dní dennej retencie a samostatná

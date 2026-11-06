@@ -34,6 +34,38 @@ Ignorované lokálne `.env` súbory obsahujú súkromnú konfiguráciu a nie sú
 artefaktom. Úspešný source tree scan nepotvrdzuje rotáciu historicky uniknutých
 tajomstiev ani čistotu všetkých minulých commitov.
 
+### Dodatočné opravy stagingu a prechodu 008 → 009
+
+Nad východiskom `1f71036` boli overené tieto nové zmeny; presné hashe testovaných
+súborov a výsledky sú v [sanitizovanom dôkaze](evidence/backend-cutover-staging-2026-11-06.json).
+Historický staging render v tabuľke vyššie už nie je aktuálny minimálny požiadavok:
+nový overlay vyžaduje **Compose 2.30.0+** a Python **3.10+** pre launcher.
+
+- Zdedene exportované `DATABASE_URL`/`REDIS_URL` už neprepíšu privátny staging súbor.
+  `format: raw` zachová jeho doslovné URL, `!reset` odstráni pôvodné environment
+  mapovanie. Launcher pred spustením overí lokálne DB/Redis ciele a zhodu DB mena,
+  používateľa a hesla. Skutočný Compose render s falošnými vzdialenými shell URL prešiel.
+- Stagingový launcher najprv zostaví image, zastaví staré API/worker, spustí zdravé
+  závislosti a vykoná migráciu. Aplikácie spustí až po jej úspechu. Zlyhanie migrácie
+  v procesnom teste ponechalo aplikácie zastavené. Tento test nie je kontajnerový beh.
+- Percent-enkódované heslá DB už nevyvolajú ConfigParser interpolation chybu.
+  Regresné testy CLI aj programatického Alembic vstupu najprv reprodukovali chybu
+  a po oprave oba prešli; offline SQL pritom neotvára sieťové spojenie.
+- **Python 3.12.13**, frozen lock, izolovaný PostgreSQL **16.15** aj **18.6**, vždy
+  samostatný Redis: na každom **142 passed, 0 skipped**. Celá sada zahŕňa nové
+  staging kontroly aj startup guard pre revízie 008/009, zlyhanie migrácie s
+  transakčným rollbackom a regresiu straty nových polí pri downgrade.
+- PostgreSQL **18.6**: custom-format záloha syntetickej 008 bola obnovená do novej
+  databázy na 008, zatiaľ čo zdroj už bol na 009. Zachovali sa tri fixture riadky,
+  väzba nálezu na aplikáciu aj immutable audit trigger. Archív sa po kontrole odstránil;
+  testovacie služby boli zastavené. **Nešlo o produkčné dáta ani produkčný backup.**
+
+[Koordinovaný cutover a obnova](MIGRATION_008_009_CUTOVER.md) vyžadujú zastavenie
+starého API/workera pred upgrade; samotný pre-deploy hook nestačí. Starý image s
+head 008 sa proti 009 nespustí. Návrat cez `downgrade` by odstránil nové polia nálezov;
+preferovaný návrat používa overenú zálohu do novej databázy a zohľadní nové zápisy.
+Finálne kontajnery, produkčná záloha/obnova a aktuálny cloud backend CI tým nie sú potvrdené.
+
 ## Zmeny build konfigurácie a zostávajúce lokálne obmedzenia
 
 - CI je zosúladené s Node.js 22; Docker konfigurácia používa frozen `uv.lock`
@@ -123,7 +155,8 @@ Finálny snapshot bol publikovaný cez UI s potvrdením **Your website was updat
 Po publikovaní prešla čerstvá produkčná kontrola **12/12** o
 **03:21:53 UTC, 6. 11. 2026**; podrobnosti sú v
 [novom sanitizovanom dôkaze](evidence/lovable-production-final-2026-11-06.json).
-IAB po reloadnutí publikovanej adresy zobrazilo funkčné prihlásenie bez chyby.
+IAB po reloadnutí publikovanej adresy zobrazilo prihlasovaciu obrazovku bez chyby.
+Produkčné odoslanie prihlasovacích údajov ani úspešná autentifikácia tým overené neboli.
 
 Lokálna pracovná kópia `frontend` je na rovnakom `main`, dev server počúva na
 `0.0.0.0:8080`. Reálny lokálny login/me/orgs/CSRF/logout tok prešiel **7/7**

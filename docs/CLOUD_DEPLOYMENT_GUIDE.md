@@ -19,7 +19,10 @@ Verejné URL sú v NOTION_NOTES.md; interné DSN ani heslá do dokumentácie nep
 ## Nastavenie služieb
 
 Root pre API/worker: apps/api. Dockerfile API: Dockerfile; worker: worker.Dockerfile.
-Pre-deploy API: python -m app.migrations upgrade. Štart a health definujú
+Migrácie vykonáva nový API image cez `python -m app.migrations upgrade`.
+Prechod 008 → 009 vyžaduje koordinované zastavenie starého API/workera a overenú
+zálohu podľa [cutover/rollback postupu](MIGRATION_008_009_CUTOVER.md); samotný
+automatický pre-deploy hook bez tejto koordinácie nestačí. Štart a health definujú
 apps/api/railway.api.json a railway.worker.json. Ak platforma pre nový projekt vyžaduje
 IaC alebo nastavenia cez API, nastaviť ekvivalent a overiť efektívny config deploymentu;
 existencia súboru automaticky nedokazuje jeho použitie.
@@ -30,8 +33,11 @@ nastaviť iba podľa overeného ingressu; nepoužiť wildcard. Hodnoty tajomstie
 
 ## Frontend a overenie
 
-Na vercel.app klient používa relatívne /api a rewrite na Railway. VITE_API_URL je
-verejná build konfigurácia pre iné hosty, nikdy úložisko backendových tajomstiev.
+Primárny frontend je samostatný repozitár `youh4ck3dme/straz-security-beacon`
+publikovaný na `https://straz-security-beacon.lovable.app`. Browser používa relatívne
+`/api/*` a `/healthz/*`; cieľ FastAPI nastavuje serverová proxy. `VITE_API_URL`
+obsahuje iba verejnú adresu upstreamu bez koncového `/api`, nikdy backendové tajomstvá.
+Starší frontend z `apps/web` má na vercel.app relatívne `/api` a rewrite na Railway.
 CSP je v tomto PR iba Report-Only. Pre enforcement je nutný schválený preview/browser test.
 
 Po schválenom deployi overiť HTTPS liveness/readiness, DB aj Redis, HSTS, preflight,

@@ -79,3 +79,26 @@ def test_postgresql_batch_foreign_keys_keep_historical_names():
             f"ALTER TABLE {table} ADD CONSTRAINT {table}_organization_id_fkey "
             "FOREIGN KEY(organization_id) REFERENCES organizations (id) ON DELETE CASCADE"
         ) in normalized_sql
+
+
+@pytest.mark.parametrize("entrypoint", ["cli", "helper"])
+def test_encoded_database_password_is_preserved(entrypoint):
+    # Percent-encoded credentials are valid URLs, but ConfigParser treats '%' specially.
+    url = "postgresql+asyncpg://fixture:encoded%25%40%2F%23@127.0.0.1/migration_test"
+    if entrypoint == "cli":
+        arguments = [sys.executable, "-m", "alembic", "upgrade", "head", "--sql"]
+    else:
+        arguments = [sys.executable, "-c", (
+            "import os; from alembic import command; "
+            "from app.migrations import get_alembic_config; "
+            "c=get_alembic_config(); "
+            "assert c.get_main_option('sqlalchemy.url') == os.environ['DATABASE_URL']; "
+            "command.upgrade(c, 'head', sql=True)"
+        )]
+    result = subprocess.run(
+        arguments, cwd=API_ROOT,
+        env={**os.environ, "DATABASE_URL": url, "STRAZ_ENV": "test"},
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, "Encoded URL migration configuration failed"
+    assert "009_cvss_and_poc_fields" in result.stdout
