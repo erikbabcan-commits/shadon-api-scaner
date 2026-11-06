@@ -1,0 +1,12 @@
+{
+  "commit": "83a25c30bdcc14021a4664bcafab5d6198745699",
+  "python": "3.12.15",
+  "schema_at_image_head": true,
+  "redis_ping": true,
+  "worker_health_key_present": true,
+  "worker_health_key_ttl": 3518,
+  "arq_process_count": 1,
+  "trusted_proxy_allowlist_configured": false,
+  "observed_at_utc": "2026-11-06T08:39:30.845076+00:00",
+  "scope": "Read-only command in the production worker container through an already registered SSH key; no jobs enqueued"
+}

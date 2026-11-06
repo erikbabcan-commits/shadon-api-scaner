@@ -1,0 +1,103 @@
+{
+  "observed_at_utc": "2026-11-06T08:24:11.118519+00:00",
+  "origin": "https://straz-security-beacon.lovable.app",
+  "transport": "HTTPS requests through published frontend same-origin proxy; no browser automation",
+  "credentials_or_session_values_recorded": false,
+  "production_scans_or_notifications_triggered": false,
+  "global_logout_invoked": false,
+  "checks": [
+    {
+      "name": "unauthenticated me",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "configured existing account login",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "authenticated me",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "authenticated organizations",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "authorized apps",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "authorized findings",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "authorized runs",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "nonmember organization rejected",
+      "status": 403,
+      "expected": 403,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "foreign-origin logout rejected",
+      "status": 403,
+      "expected": 403,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "session preserved after rejected logout",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "no_store": true
+    },
+    {
+      "name": "discarded local session is unauthenticated",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "no_store": true
+    }
+  ],
+  "same_identity_returned": true,
+  "cookie_attributes": [
+    {
+      "secure": true,
+      "httponly": true,
+      "samesite": "None",
+      "path": "/"
+    },
+    {
+      "secure": true,
+      "httponly": true,
+      "samesite": "none",
+      "path": "/"
+    }
+  ],
+  "all_exercised_checks_passed": true
+}

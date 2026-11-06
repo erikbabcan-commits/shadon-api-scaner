@@ -1,0 +1,15 @@
+{
+  "created_at_utc": "2026-11-06T09:16:31.574238+00:00",
+  "source_server_version": "8.2.11",
+  "transport": "Existing authorized Railway SSH access, loopback tunnel; no public Redis port created",
+  "archive_bytes": 356,
+  "rdb_checksum_verified": true,
+  "isolated_restore_ping_verified": true,
+  "restored_server_version": "8.10.3",
+  "restore_isolation": "Private Unix socket only, TCP port 0; no worker or scheduler",
+  "production_auth_or_data_configuration_changed": false,
+  "cross_database_consistent_snapshot_claimed": false,
+  "rdb_expiring_keys": "Key counts not compared: expiry during load is expected Redis behavior",
+  "existing_other_agent_ssh_keys_modified": false,
+  "owned_tunnel_and_restore_stopped": true
+}

@@ -1,0 +1,39 @@
+{
+  "backup_created_at_utc": "2026-11-06T08:15:48.258349+00:00",
+  "restore_verified_at_utc": "2026-11-06T08:21:26.581297+00:00",
+  "scope": "Real production PostgreSQL backup, private archive retained outside Git; no row contents or credentials included in this evidence",
+  "source_server_version": "18.6 (Debian 18.6-1.pgdg13+2)",
+  "backup_revision": [
+    "008_postgres_uuid_and_audit_fk"
+  ],
+  "source_transaction_read_only": true,
+  "table_counts_compared_against_same_source_snapshot": 16,
+  "restore_verified": true,
+  "restore_isolation": "Private Unix socket only, TCP disabled; no API, worker, scheduler or integrations started",
+  "audit_protection_on_restored_copy": {
+    "update_rejected": true,
+    "delete_rejected": true
+  },
+  "upgrade_preflight": {
+    "candidate_commit": "d5707b94f19797a08b68758ce9c2e7f82a6758c2",
+    "before_revision": "008_postgres_uuid_and_audit_fk",
+    "after_revision": "009_cvss_and_poc_fields",
+    "original_table_counts_and_row_hashes_preserved": true,
+    "sha256_row_hashes_compared_tables": 15,
+    "008_009_startup_guards_verified": true,
+    "production_database_modified": false,
+    "container_images_exercised": false
+  },
+  "temporary_access_cleanup": {
+    "temporary_workspace_ssh_key_revoked": true,
+    "temporary_local_key_files_removed": true,
+    "tunnel_closed": true,
+    "credential_bearing_tunnel_log_removed": true,
+    "database_public_access_enabled": false,
+    "other_agents_keys_and_connections_modified": false
+  },
+  "archive_not_committed": true,
+  "automated_backup_schedule_configured": false,
+  "production_schema_upgrade_performed": false,
+  "production_secret_rotation_performed": false
+}

@@ -1,0 +1,147 @@
+{
+  "observed_at_utc": "2026-11-06T09:07:13.548198+00:00",
+  "source_commit": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+  "verification_configuration_commit": "1e2db87cad8337da8c97b4cc3ed74a168e52c70e",
+  "platform": "linux/amd64 API and worker under OrbStack emulation",
+  "production_data_used": false,
+  "production_jobs_enqueued": false,
+  "outbound_target": "https://straz-api-production.up.railway.app/healthz/liveness",
+  "checks": [
+    {
+      "name": "straz-api:1e2db87 non-root and no dev dependencies",
+      "passed": true
+    },
+    {
+      "name": "straz-worker:1e2db87 non-root and no dev dependencies",
+      "passed": true
+    },
+    {
+      "name": "api image rejects revision 008",
+      "passed": true
+    },
+    {
+      "name": "worker image rejects revision 008",
+      "passed": true
+    },
+    {
+      "name": "image migrates database to 009",
+      "passed": true
+    },
+    {
+      "name": "API readiness includes DB and Redis",
+      "passed": true
+    },
+    {
+      "name": "production HSTS emitted",
+      "passed": true
+    },
+    {
+      "name": "container login",
+      "passed": true
+    },
+    {
+      "name": "production cookie flags",
+      "passed": true
+    },
+    {
+      "name": "container authenticated me",
+      "passed": true
+    },
+    {
+      "name": "production simulated billing denied despite opt-in",
+      "passed": true
+    },
+    {
+      "name": "free tier API key gate",
+      "passed": true
+    },
+    {
+      "name": "synthetic application created",
+      "passed": true
+    },
+    {
+      "name": "unisolated CLI profile remains blocked",
+      "passed": true
+    },
+    {
+      "name": "heartbeat accepted into Redis queue",
+      "passed": true
+    },
+    {
+      "name": "real worker finished queued run",
+      "passed": true
+    },
+    {
+      "name": "heartbeat result persisted through API",
+      "passed": true
+    },
+    {
+      "name": "read-only API key created on synthetic paid fixture",
+      "passed": true
+    },
+    {
+      "name": "ci:runs:read accesses completed run",
+      "passed": true
+    },
+    {
+      "name": "ci:runs:read cannot enqueue scans",
+      "passed": true
+    },
+    {
+      "name": "API key cannot override tenant",
+      "passed": true
+    },
+    {
+      "name": "session cannot override tenant",
+      "passed": true
+    },
+    {
+      "name": "synthetic account logout",
+      "passed": true
+    },
+    {
+      "name": "secure host cookie expires with valid attributes",
+      "passed": true
+    },
+    {
+      "name": "logout invalidates prior token",
+      "passed": true
+    },
+    {
+      "name": "worker remains running",
+      "passed": true
+    }
+  ],
+  "postgres_version": "18.6",
+  "images": {
+    "straz-api:1e2db87": {
+      "id": "sha256:27a32cd56d5e37ec01c360b46551d5416a932edc974cfa1122c3d534ba28e05b",
+      "architecture": "amd64",
+      "user": "appuser",
+      "runtime": {
+        "uid": 1000,
+        "python": "3.12.16",
+        "machine": "x86_64",
+        "pytest": false,
+        "aiosqlite": false
+      }
+    },
+    "straz-worker:1e2db87": {
+      "id": "sha256:c6402fe7693e8ee93dd63bec904222a5413e6c8892b5fc177320555b76a60e1d",
+      "architecture": "amd64",
+      "user": "straz",
+      "runtime": {
+        "uid": 10001,
+        "python": "3.12.16",
+        "machine": "x86_64",
+        "pytest": false,
+        "aiosqlite": false
+      }
+    }
+  },
+  "all_checks_passed": true,
+  "synthetic_paid_fixture_seeded": true,
+  "upstream_http_cookie_transport": "Cookie header explicitly forwarded to simulate HTTP after TLS termination; not a browser TLS test",
+  "owned_test_containers_removed": true,
+  "owned_test_network_removed": true
+}

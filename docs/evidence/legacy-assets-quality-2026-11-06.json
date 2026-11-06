@@ -1,0 +1,29 @@
+{
+  "observed_at_utc": "2026-11-06T10:22:37.363481+00:00",
+  "source_commit": "3777a377faa161fc771aa2f69b9101954cc39836",
+  "image": "straz-legacy-web:3777a37",
+  "checks": [
+    {
+      "name": "index.html copied by actual image command",
+      "passed": true
+    },
+    {
+      "name": "sw.js copied by actual image command",
+      "passed": true
+    },
+    {
+      "name": "manifest.webmanifest copied by actual image command",
+      "passed": true
+    },
+    {
+      "name": "generated SW contains NetworkOnly",
+      "passed": true
+    },
+    {
+      "name": "read-only destination fails without success message",
+      "passed": true
+    }
+  ],
+  "owned_container_removed": true,
+  "scope": "Actual asset image command and generated files; not a browser cache audit"
+}

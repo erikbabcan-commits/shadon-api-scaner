@@ -1,7 +1,26 @@
 # STRÁŽ — prevádzkové overenie a čakajúce rozhodnutia
 
-Tento dokument je postup, nie potvrdenie vykonania v produkcii. Aktuálny stav
-Railway služieb, backupov a tajomstiev vyžaduje oprávnený platformový prístup.
+Tento dokument rozlišuje vykonané read-only kontroly a otvorené prevádzkové kroky.
+Produkčná rotácia, reštarty a deploy vyžadujú výslovné schválenie používateľa.
+
+## Stav overený 6. 11. 2026
+
+- Railway CLI je prihlásené do H4CK3D's Projects / dev-new / production; API,
+  worker, Postgres a Redis sú online. Verejná readiness a autentifikovaný HTTP tok
+  cez Lovable sú doložené v [release zázname](RELEASE_READINESS_2026-11-06.md).
+- Privátna produkčná PG 18.6 záloha revízie 008 bola obnovená do novej izolovanej
+  databázy bez TCP, workera a integrácií. Zhodovalo sa 16 tabuliek zo zdrojového
+  snapshotu a ochrana auditu; následný upgrade obnovenej kópie zachoval dáta 15
+  aplikačných tabuliek. [Dôkaz bez obsahu dát](evidence/production-backup-restore-2026-11-06.json).
+- Privátna RDB záloha Redis 8.2.11 prešla checksum kontrolou a obnovou/PING na
+  izolovanom Redis 8.10.3. Nie je to dôkaz spoločného PG/Redis snapshotu ani
+  zachovania rozpracovaných úloh. [Dôkaz](evidence/redis-backup-restore-2026-11-06.json).
+- API aj worker stále používajú runtime `83a25c3` / schému 008; ich konfigurovaný
+  source pin `8540cde` sa líši od runtime aj od release kandidáta. Žiadny z nich
+  sa automaticky nepovažuje za aktuálny schválený deployment.
+- Automatické zálohy, vzdialená retencia, obnova po výpadku celého počítača,
+  doručené alerty, rotácia tajomstiev a produkčný upgrade 009 zostávajú otvorené.
+  Lokálne súkromné zálohy nenahrádzajú off-site zálohu mimo tohto počítača.
 
 ## Read-only DB kontrola a osirelé aplikácie
 
@@ -20,8 +39,9 @@ Toto PR nepridáva backfill, novú schému ani produkčný dátový zápis.
 ## Záloha a izolovaný restore
 
 Koordináciu API/workera pri zmene head 008 → 009 a návrat cez novú databázu opisuje
-[cutover/rollback postup](MIGRATION_008_009_CUTOVER.md). Jeho syntetická skúška
-nenahrádza nasledujúcu kontrolu reálnej produkčnej zálohy.
+[cutover/rollback postup](MIGRATION_008_009_CUTOVER.md). Reálna manuálna skúška
+je doložená vyššie; nasledujúci postup treba zopakovať pri finálnom cutover a
+previesť na schválenú automatickú retenčnú politiku.
 
 1. V Railway overiť existujúci Postgres backup/PITR plán a podporu služby/plánu.
    Zaznamenať ID poslednej úspešnej zálohy, čas, rozsah, privátny prístup a retenciu.
@@ -36,8 +56,9 @@ nenahrádza nasledujúcu kontrolu reálnej produkčnej zálohy.
    odchádzajúce integrácie, worker a scheduler, nevytvárať verejnú doménu. Výpis len počtov.
 5. Overiť restore, `alembic_version`, počty a FK, audit retention/immutability v izolovanom
    cieli a API read-only dostupnosť. Zaznamenať čas obnovy a výsledky, nie obsah riadkov.
-6. Izolovaný cieľ a dočasnú zálohu odstrániť podľa schválenej politiky. Výsledok pripojiť
-   k release. Bez týchto dôkazov zostáva backup/restore **neoverený**.
+6. Izolovaný cieľ odstrániť podľa schválenej politiky, úspešný privátny archív ponechať
+   počas schválenej retencie. Výsledok pripojiť k release. Neodstraňovať jedinú overenú
+   obnoviteľnú zálohu v rámci cleanupu. Bez čerstvého dôkazu nemožno tvrdiť aktuálny RPO/RTO.
 
 ## Alerty a monitoring
 
@@ -52,14 +73,29 @@ Aktuálne nastavenie, doručenie, retencia logov a RPO/RTO **neboli týmto PR po
 
 ## Zdroj deploya a zodpovednosť
 
-Posledný runtime report uvádza pin commitSha na API aj workeri. Tento fakt treba znovu
-overiť cez Railway konfiguráciu, nie podľa stavu GitHub main. Pri ponechanom pine push
+Konfigurácia a runtime sú oddelené identity: posledné overenie ukázalo source pin
+`8540cde` a bežiace `83a25c3` na API aj workeri. Pred nasadením tieto hodnoty znovu
+overiť cez Railway konfiguráciu a runtime, nie podľa stavu GitHub main. Pri ponechanom pine push
 do main nespustí automaticky nový kód. Nasadenie schváleného SHA riadi vlastník projektu
 alebo poverený release operátor s prístupom do workspace. Zaznamenať SHA oboch služieb.
 
 Automatický deploy z main zapnúť až po samostatnom schválení a vynútených CI gates
 (secret-scan, backend PG 16/18, frontend). Pred tým nespúšťať neotestovaný main automaticky.
 Po každom nasadení overiť health, vlastnú autorizovanú reláciu a worker zodpovedajúceho SHA.
+
+## Súkromné CLI tunely
+
+Existujúce platné prihlásenie sa nemusí rušiť príkazom logout. `railway status` možno
+volať s explicitným projektom a environment bez zmeny lokálneho linku. Pred použitím
+existujúceho loopback tunela overiť jeho cieľ aj `pg_isready`; samotný počúvajúci port
+nie je dôkaz zdravého DB spojenia. Cudzie tunely sa nezastavujú.
+
+Port pre `railway connect Postgres --tunnel-only` má syntax `-P 55432`, nie
+`-P 127.0.0.1:55432`. Pozor na výstup CLI: implementácia `print_tunnel_info`
+vypisuje na stderr aj heslo a celé URL. Pri pravidle bez výpisu tajomstiev musí
+proces použiť stdout aj stderr do DEVNULL; úspech overiť nezávisle cez pg_isready.
+Verejný DB port sa nepovoľuje. Žiadne callback kódy sa neopakujú ani nekopírujú
+do príkazov. [Zdroj implementácie CLI](https://github.com/railwayapp/cli/blob/master/src/commands/connect.rs).
 
 ## Proxy, klientova IP a limiter
 

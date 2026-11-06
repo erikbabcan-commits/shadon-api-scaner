@@ -35,6 +35,10 @@ produkčný rollback.
 
 1. Pripraviť nový súkromný Postgres, Redis a konfiguráciu na cieľovom serveri.
    Produkčný frontend zatiaľ ponechať na pôvodnom API. Nový worker ešte nespúšťať.
+   Pre obnovu aktuálnej produkcie zvoliť PostgreSQL **18** a kompatibilný Redis
+   **8.2 alebo novší overený**. Základný Compose s Postgres 16/Redis 7 nie je
+   automatický cieľ obnovy novších produkčných dát. Existujúce volumes sa nesmú
+   prepnúť na inú major verziu iba zmenou image tagu.
 2. Na izolovanom cieli obnoviť skúšobnú zálohu 008 a overiť revíziu, počty,
    vzťahy a auditné ochrany. Nespúšťať notifikácie, platby ani skeny z obnovenej kópie.
 3. Novým kandidátskym API image vykonať na tejto kópii `python -m app.migrations upgrade`.
@@ -71,6 +75,9 @@ Advisory lock migrácie serializuje migrátorov, ale nezastavuje staré aplikač
   prechodovú zálohu 008 do **novej izolovanej databázy**. Overiť ju s kompatibilným
   starým image a až potom koordinovane prepnúť API aj worker. Rozdiely od zálohy
   musia byť vyhodnotené; nesmú sa potichu zahodiť nové nálezy alebo účty.
+  Ak záloha predchádza rotácii tajomstiev, pred otvorením prístupu znovu uplatniť
+  schválené nové prihlasovacie údaje vrátane hesla administrátora; jeho hash je
+  súčasťou DB zálohy. Bootstrap premenná sama existujúce heslo účtu nemení.
 
 ## Rozsah vykonanej skúšky
 
@@ -84,4 +91,12 @@ Samostatná lokálna skúška PostgreSQL 18 vykonala custom-format dump na 008,
 posunula zdroj na 009 a obnovila dump do novej databázy na 008. Overila počty,
 väzbu nálezu na aplikáciu a zachovanie immutable audit triggera. Použila iba
 syntetické dáta. Dôkazy sú v [release zázname](RELEASE_READINESS_2026-11-06.md).
-Tým **nie je potvrdená produkčná záloha, produkčný restore ani beh finálnych image**.
+Táto syntetická skúška sama produkčný backup nepotvrdzuje. Následná samostatná
+[reálna produkčná záloha a restore](evidence/production-backup-restore-2026-11-06.json)
+už overila všetkých 16 tabuliek a audit; upgrade jej izolovanej kópie na 009 zachoval
+pôvodné riadky v 15 aplikačných tabuľkách. Migračné zdroje medzi testovaným `d5707b9`
+a kontajnerovým kandidátom `1e2db87` sa nezmenili. Produkcia ostala na 008.
+
+[Kontajnerový test kandidáta 1e2db87](evidence/container-runtime-2026-11-06.json)
+samostatne overil startup guardy 008/009 a celý API/Redis/worker/PG tok na syntetických
+dátach. Ani tento výsledok neznamená produkčný deploy alebo schválenie servisného okna.
