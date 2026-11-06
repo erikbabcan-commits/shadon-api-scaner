@@ -105,10 +105,16 @@ async def simulate_activation(
     org_ctx: OrgContext = Depends(require_org_role(OrgRole.admin)),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, str]:
+    """Grant a synthetic plan only after explicit opt-in outside production."""
     if settings.is_production:
         raise HTTPException(
             status_code=403,
-            detail="Simulated activation is only available in development mode",
+            detail="Simulated activation is unavailable in production",
+        )
+    if not settings.straz_allow_simulated_billing:
+        raise HTTPException(
+            status_code=403,
+            detail="Simulated activation is disabled",
         )
     tier = body.tier.lower()
     if tier not in ("free", "starter", "pro", "agency"):
@@ -118,6 +124,9 @@ async def simulate_activation(
         )
 
     org = org_ctx.organization
+    if org.stripe_subscription_id:
+        raise HTTPException(status_code=409, detail="Organization has a Stripe subscription")
+    previous_tier = org.plan_tier
     org.plan_tier = tier
     org.subscription_status = "active"
     start, end = get_current_period_bounds(org)
@@ -127,10 +136,12 @@ async def simulate_activation(
     await write_audit(
         db,
         action="billing.simulated_activation",
+        org_id=org_ctx.org_id,
         user_id=org_ctx.user.id,
         entity_type="organization",
         entity_id=str(org_ctx.org_id),
-        detail=f"Simulated plan activation to {tier}",
+        detail=f"Simulated plan activation from {previous_tier} to {tier}",
+        details={"previous_tier": previous_tier, "next_tier": tier},
     )
     await db.commit()
     return {"status": "activated", "tier": tier}

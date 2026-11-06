@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     )
 
     straz_env: str = "development"
+    straz_allow_simulated_billing: bool = False
     straz_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     straz_cookie_samesite: str = "lax"
     straz_cookie_domain: str | None = None

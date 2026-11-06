@@ -3,11 +3,13 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.models import (
     App,
+    AuditEvent,
     Organization,
     OrganizationMember,
     OrgRole,
@@ -23,7 +25,7 @@ from app.security import create_session_token, hash_password
 
 @pytest.mark.asyncio
 async def test_docker_compose_and_staging_env_verification():
-    """Verify Docker Compose configuration and staging environment definition."""
+    """Keep the local staging template free of ready-to-use authentication secrets."""
     compose_path = Path(__file__).resolve().parents[3] / "deploy" / "docker-compose.yml"
     assert compose_path.exists(), "docker-compose.yml must exist in deploy/"
     compose_content = compose_path.read_text()
@@ -42,11 +44,19 @@ async def test_docker_compose_and_staging_env_verification():
     staging_env_content = staging_env_path.read_text()
     assert "STRAZ_ENV=staging" in staging_env_content
     assert "STRIPE_SECRET_KEY=" in staging_env_content  # Blank / disabled
+    values = dict(
+        line.split("=", 1)
+        for line in staging_env_content.splitlines()
+        if "=" in line and not line.lstrip().startswith("#")
+    )
+    for name in ("POSTGRES_PASSWORD", "DATABASE_URL", "STRAZ_ADMIN_EMAIL", "STRAZ_ADMIN_PASSWORD", "STRAZ_SESSION_SECRET"):
+        assert values[name] == "", f"{name} must require private staging setup"
+    assert values["STRAZ_ALLOW_SIMULATED_BILLING"] == "false"
 
 
 @pytest.mark.asyncio
-async def test_simulate_activation_security(client: AsyncClient, db_session: AsyncSession):
-    """Verify simulate-activation endpoint is secure: rejected for unauthenticated, non-admins, and prod."""
+async def test_simulate_activation_security(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    """Require admin opt-in, deny production/Stripe changes, and audit plan transitions."""
     settings = get_settings()
 
     user = User(
@@ -89,21 +99,38 @@ async def test_simulate_activation_security(client: AsyncClient, db_session: Asy
     assert resp_viewer.status_code == 403
     assert "admin" in resp_viewer.json()["detail"].lower()
 
-    # 3. Production environment refusal
+    # 3. Missing opt-in denies every non-production environment.
     member.role = OrgRole.admin
     await db_session.commit()
+    monkeypatch.delenv("STRAZ_ALLOW_SIMULATED_BILLING", raising=False)
+    defaults = Settings(_env_file=None)
+    assert defaults.straz_allow_simulated_billing is False
+    monkeypatch.setattr(settings, "straz_allow_simulated_billing", defaults.straz_allow_simulated_billing)
+    for environment in ("development", "staging", "unrecognized"):
+        monkeypatch.setattr(settings, "straz_env", environment)
+        denied = await client.post(
+            "/api/billing/simulate-activation",
+            headers={"X-Organization-Id": str(org.id), "X-Requested-With": "XMLHttpRequest"},
+            json={"tier": "starter"},
+        )
+        assert denied.status_code == 403
+        assert "disabled" in denied.json()["detail"].lower()
+        await db_session.refresh(org)
+        assert org.plan_tier == "free"
 
-    settings.straz_env = "production"
+    # 4. Production remains denied even with explicit opt-in.
+    monkeypatch.setattr(settings, "straz_allow_simulated_billing", True)
+    monkeypatch.setattr(settings, "straz_env", "production")
     resp_prod = await client.post(
         "/api/billing/simulate-activation",
         headers={"X-Organization-Id": str(org.id), "X-Requested-With": "XMLHttpRequest"},
         json={"tier": "starter"},
     )
     assert resp_prod.status_code == 403
-    assert "development mode" in resp_prod.json()["detail"].lower()
+    assert "production" in resp_prod.json()["detail"].lower()
 
-    # 4. Staging / non-production environment -> 200 OK
-    settings.straz_env = "staging"
+    # 5. Explicitly opted-in staging grants and audits the synthetic plan.
+    monkeypatch.setattr(settings, "straz_env", "staging")
     resp_staging = await client.post(
         "/api/billing/simulate-activation",
         headers={"X-Organization-Id": str(org.id), "X-Requested-With": "XMLHttpRequest"},
@@ -115,13 +142,43 @@ async def test_simulate_activation_security(client: AsyncClient, db_session: Asy
     await db_session.refresh(org)
     assert org.plan_tier == "starter"
     assert org.subscription_status == "active"
+    event = await db_session.scalar(select(AuditEvent).where(
+        AuditEvent.action == "billing.simulated_activation",
+        AuditEvent.entity_id == str(org.id),
+    ))
+    assert event is not None
+    assert event.organization_id == org.id
+    assert event.user_id == user.id
+    assert event.details == {"previous_tier": "free", "next_tier": "starter"}
+    assert event.detail == "Simulated plan activation from free to starter"
+
+    # 6. An existing Stripe subscription is never overwritten by simulation.
+    org.stripe_subscription_id = "sub_synthetic_existing"
+    await db_session.commit()
+    previous_period = (org.current_period_start, org.current_period_end)
+    rejected = await client.post(
+        "/api/billing/simulate-activation",
+        headers={"X-Organization-Id": str(org.id), "X-Requested-With": "XMLHttpRequest"},
+        json={"tier": "agency"},
+    )
+    assert rejected.status_code == 409
+    await db_session.refresh(org)
+    assert org.plan_tier == "starter"
+    assert org.subscription_status == "active"
+    assert (org.current_period_start, org.current_period_end) == previous_period
+    events = list(await db_session.scalars(select(AuditEvent).where(
+        AuditEvent.action == "billing.simulated_activation",
+        AuditEvent.entity_id == str(org.id),
+    )))
+    assert len(events) == 1
 
 
 @pytest.mark.asyncio
-async def test_m2m_acceptance_lifecycle(client: AsyncClient, db_session: AsyncSession):
+async def test_m2m_acceptance_lifecycle(client: AsyncClient, db_session: AsyncSession, monkeypatch):
     """Full end-to-end M2M acceptance lifecycle on isolated staging database."""
     settings = get_settings()
-    settings.straz_env = "staging"
+    monkeypatch.setattr(settings, "straz_env", "staging")
+    monkeypatch.setattr(settings, "straz_allow_simulated_billing", True)
 
     # 1. Bootstrap Staging Admin & Organization
     admin_user = User(
@@ -323,10 +380,10 @@ async def test_m2m_acceptance_lifecycle(client: AsyncClient, db_session: AsyncSe
 
 
 @pytest.mark.asyncio
-async def test_least_privilege_scope_split(client: AsyncClient, db_session: AsyncSession):
+async def test_least_privilege_scope_split(client: AsyncClient, db_session: AsyncSession, monkeypatch):
     """Verify scope split: ci:runs:read allows status retrieval but blocks scan triggering."""
     settings = get_settings()
-    settings.straz_env = "staging"
+    monkeypatch.setattr(settings, "straz_env", "staging")
 
     user = User(
         id=uuid.uuid4(),

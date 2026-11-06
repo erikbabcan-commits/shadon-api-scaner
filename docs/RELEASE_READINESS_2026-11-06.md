@@ -2,14 +2,17 @@
 
 **Stav: pripravené lokálne opravy; produkčný release nie je uzavretý.**
 Tento záznam neoznačuje produkciu za „AAA“ ani úplne zelenú. Úspešné lokálne
-testy, historické CI a hlásenie Lovable sú odlišné dôkazy. Zmeny zatiaľ nie sú
-potvrdené novým produkčným deploymentom.
+testy, historické CI a hlásenie Lovable sú odlišné dôkazy. Lovable frontend je
+publikovaný a verejné API prepojenie je overené; nové backendové opravy zatiaľ
+nie sú potvrdené produkčným deploymentom.
 
 Východiskový lokálny HEAD: `c5db6aeb9ae82839444076eeebd45c5ca5f6bc9b`, vetva
 `feat/straz-m2m-runs-read`. Opravy nad týmto commitom sú pripravené na review vo vetve
 `codex/production-readiness-20261106`; autoritatívny výsledný commit určuje HEAD pull requestu.
-Kód na `5a6186fb5a801b571339f26eb1997766bfb50ea3` je v
-[draft PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/6).
+Posledný pushnutý HEAD je `3dac520be44b3c576c682392c20817a3307e68e2` v
+[PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/pull/6), ktorý je
+otvorený a pripravený na review (`isDraft: false`). Aktuálne necommitnuté opravy
+z následnej kontroly ešte nie sú súčasťou tohto SHA.
 
 ## Lokálne overené tímom
 
@@ -18,7 +21,8 @@ Kód na `5a6186fb5a801b571339f26eb1997766bfb50ea3` je v
 | SQLite migrácie | Opravené názvy FK constraintov v migráciách 002 a 007; doplnené regresné testy. |
 | Backend | Python **3.12.13** s izolovaným PostgreSQL **16.15** aj **18.6**, zakaždým s vlastným Redisom: v každej vetve **132 passed, 0 skipped**. Overené na `5a6186f`, lokálne macOS ARM64; nejde o cloud Linux CI. |
 | Izolácia testov | Testovacie služby po kontrolách zastavené; lokálne vývojové API a Redis zostali zdravé. Produkčná databáza sa nepoužila. |
-| M2M acceptance | **4 passed** po aktualizácii cesty stagingovej šablóny. |
+| Následné billing opravy | **12 passed** v cielenom M2M/billing/audit/health výbere na Python 3.14.6; ďalší beh **4 passed** s kontrolou obnovenia cached nastavení. Simulácia je default-off, produkcia ju vždy odmietne, existujúce Stripe predplatné sa nemení a úspešná simulácia audituje pôvodný/nový plán. |
+| Izolovaný staging | Compose **5.7.0** config render potvrdil iba dva loopback porty a API/worker env súbor `.env.staging`; prázdna šablóna bola odmietnutá. Overlay používa `!override`, vyžaduje Compose 2.24.4+. Kontajnery sa nespustili. |
 | Frontend | Po `npm ci`: **19 testov prešlo**, TypeScript a Vite/PWA build skončili s exit 0. |
 | Frontend runtime závislosti | `seroval` v lockfile aktualizovaný **1.6.7 → 1.7.7** bez zmeny manifestu; `npm audit --omit=dev` hlási **0 nálezov**. |
 | Sanitizovaná šablóna | `deploy/.env.staging.example` premenovaná na `deploy/.env.example`; secret gate nebol oslabený. |
@@ -45,25 +49,48 @@ tajomstiev ani čistotu všetkých minulých commitov.
   oprava **11.0.1** mimo rozsahu `^10`). Neboli použité force aktualizácie
   ani neoverené overrides cez major verzie.
 - Zostavenie finálnych kontajnerových image a ich runtime kontrola nie sú týmto
-  záznamom potvrdené.
+  záznamom potvrdené. Nainštalované sú nástroje Docker, Colima a Lima; samotná
+  inštalácia nie je build image. Pre tlak na pamäť a swap sa Docker VM nespustila
+  a kontajnerový build sa nevykonal.
 - Vercel konektor potvrdil dve **READY preview** nasadenia presného commitu `5a6186f`:
   [shadon-api-scaner](https://shadon-api-scaner-21aq18ywc-somnajviac.vercel.app)
   a [web](https://web-5vbuxvav8-somnajviac.vercel.app). Majú `target: null`, teda nejde
   o produkčný deploy. Verejné GET vracajú 302 na Vercel SSO; aplikačné správanie
   za Deployment Protection tým ešte nebolo overené. Ochrana ani zdieľanie sa nemenili.
 
-## Lovable — hlásenie agenta, zatiaľ bez nezávislej akceptácie
+## Lovable — publikované prepojenie a nezávislé overenie
 
 Správny projekt: [Straz Security Beacon](https://lovable.dev/projects/64e9eb25-5f23-4709-8d7f-6d0ee0fde5c9).
-Publikovaná adresa: https://straz-security-beacon.lovable.app.
+Publikovaná adresa: [straz-security-beacon.lovable.app](https://straz-security-beacon.lovable.app).
 
-Lovable agent hlási nastavenú verejnú `VITE_API_URL` na
-`https://straz-api-production.up.railway.app` bez `/api`, serverovú same-origin
-`/api/*` proxy s CSRF kontrolou a úspešných **33 testov**, TypeScript a build.
-Ide o hlásenie z preview. Root ešte nezávisle overí proxy, cookies, organizácie,
-streamy a odmietnutie cudzích originov pred publikovaním. V čase poslednej
-verejnej kontroly publikované Lovable `/api/auth/me` stále vracalo **404 HTML**.
-Browser kontrola a publikovanie momentálne čakajú na odomknutie lokálneho Macu.
+Finálny export nezávisle potvrdil verejnú `VITE_API_URL` na
+`https://straz-api-production.up.railway.app` bez `/api` a bez ďalších env kľúčov.
+Browser volá relatívne `/api/*`; serverová same-origin proxy používa pevný HTTPS
+upstream a pred mutáciami kontroluje presný Origin aj X-Requested-With. Health
+proxy povoľuje iba presné `/healthz/liveness` a `/healthz/readiness` cez GET/HEAD,
+bez odovzdania cookies. Proxy prúdi telá požiadaviek a odpovedí, odovzdáva abort
+signál, správne vyhodnocuje relatívne redirecty a na HTTPS dopĺňa Secure cookies.
+
+Lovable agent v preview deklaroval **40 úspešných testov**, TypeScript a build.
+Tieto cloudové výsledky sme lokálne neopakovali. Nezávisle sme vykonali skutočné
+súbory finálneho exportu: **51/51** kontrol API proxy a **6/6** reálnych lokálnych
+HTTP transportov na Node **22.23.4**, plus **18/18** kontrol health rout, cookies
+a serverových hlavičiek na Bun **1.4.4**; spolu **75/75**. Syntetické tenantové
+hlavičky a cookies nepotvrdzujú produkčné tenantové hranice ani prihlásenie.
+
+Po publikovaní UI zobrazilo „Published“ a aktuálnu verziu. Verejná kontrola
+**6. 11. 2026 o 02:32:43 UTC** cez curl s User-Agent `Mozilla/5.0` prešla
+**12/12** kontrolami; podrobnosti obsahuje
+[sanitizovaný JSON dôkaz](evidence/lovable-production-2026-11-06.json).
+Produkčné API už vracia **401 JSON**, health **200 JSON**, cudzie/chýbajúce Origin
+na logout **403** a nepovolené health metódy **405**. API/health odpovede majú
+`no-store, private`; všetkých 12 odpovedí malo HSTS, nosniff, Referrer-Policy,
+X-Frame-Options DENY a CSP Report-Only. CSP Report-Only na HTML zatiaľ iba
+reportuje porušenia, nevynucuje túto politiku.
+
+Bez prihlasovania sa neoverili reálne session cookies ani iPhone. Produkčné
+skeny a notifikácie sa nespúšťali. V cloudovom `AGENTS.md` zostáva doplniť
+poznámku o health routách; funkčné routy sú vo finálnom exporte aj produkcii.
 
 ## Verejne overená produkcia
 
@@ -73,12 +100,16 @@ Browser kontrola a publikovanie momentálne čakajú na odomknutie lokálneho Ma
 | Railway `/healthz/readiness` | **200**, `ready=true`; databáza aj Redis `ok`. |
 | Railway `/api/auth/me`, `/api/apps`, `/api/orgs`, `/api/findings`, `/api/runs` bez relácie | **401 JSON**, `Cache-Control: no-store`; žiadne tenantové dáta nevrátené. |
 | Vercel `/` a `/api/auth/me` | **200 HTML** a **401 JSON** cez existujúcu proxy. |
-| Lovable `/` a `/api/auth/me` | **200 HTML** a **404 HTML**; API prepojenie ešte nie je akceptované v publikovanej verzii. |
+| Lovable `/` a `/api/auth/me` | **200 HTML** a **401 JSON**; publikované same-origin API prepojenie overené 6. 11. 2026 o 02:32:43 UTC. |
+| Lovable `/healthz/liveness`, `/healthz/readiness`, `/healthz/other` | **200 JSON**, **200 JSON** s `ready=true`, **404 JSON**; všetky `no-store, private`. |
+| Lovable odmietnuté požiadavky | Logout POST bez Origin aj s cudzím Origin **403 JSON**; health POST/PUT/PATCH/DELETE/OPTIONS **405 JSON**; všetky `no-store, private`. |
+| Lovable bezpečnostné hlavičky | Všetkých 12 kontrol: HSTS, nosniff, Referrer-Policy, X-Frame-Options DENY a CSP Report-Only. |
 | Railway HTTP liveness | **301** na HTTPS. Priame HTTPS API odpovede však nemali HSTS; treba overiť nasadený kód a produkčné nastavenie. |
 
 Verejné GET kontroly nepotvrdzujú produkčné prihlásenie, cookie atribúty,
 tenantové hranice, worker, Alembic head ani účinnosť proxy trust konfigurácie.
-Produkčný login, skeny a notifikácie sa počas týchto read-only kontrol nevykonali.
+Produkčný login, skeny a notifikácie sa počas týchto kontrol nevykonali; vykonané
+POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
 
 ## GitHub a prístupy
 
@@ -89,21 +120,32 @@ Produkčný login, skeny a notifikácie sa počas týchto read-only kontrol nevy
   account is locked due to a billing issue.“ Nie je to zlyhanie aplikačného testu
   ani úspešne vykonaná kontrola.
 - Rovnakú billing annotation priamo potvrdil nový
-  [CI beh PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/runs/42141257570)
-  na `5a6186f`: secret gate nemal vykonané kroky, backend a frontend boli preskočené.
-- Railway CLI vracia `Unauthorized` a dashboard zobrazuje Login. Aktuálne
-  nasadené SHA API/workera, commit pin, premenné a prevádzkové dôkazy preto
-  neboli potvrdené.
+  [CI beh PR #6](https://github.com/erikbabcan-commits/shadon-api-scaner/actions/runs/42141731629)
+  na `3dac520` (check `127643411379`): žiadne kroky sa nevykonali, backend a
+  frontend boli preskočené. Predchádzajúci beh `42141257570` na `5a6186f` mal
+  rovnaký billing blok; ani jeden nie je úspešným testovaním release.
+- Oprávnený prístup do Railway dashboardu bol obnovený cez existujúce GitHub
+  prihlásenie; CLI naďalej vracia `Unauthorized`. Dashboard potvrdil projekt
+  `dev-new`, environment `production` a štyri online služby (API, worker,
+  PostgreSQL, Redis). Aktívna karta API ukazuje starý deployment z merge PR **#3**,
+  nie aktuálne opravy PR #6. Read-only konzola API potvrdila runtime SHA
+  `83a25c30bdcc14021a4664bcafab5d6198745699`, Python **3.12.15**, režim
+  `production`, `straz_cookie_secure=true` a `straz_cookie_samesite=none`.
+  Toto nie je overenie skutočnej prihlasovacej cookie. Interpreter aplikácie je
+  `/opt/venv/bin/python`; systémový Python nemá aplikačné závislosti.
+  Presné runtime SHA workera, Alembic head,
+  produkčné runtime nastavenia a prevádzkové dôkazy ešte neboli získané.
 
 ## Podmienky pred uzavretím release
 
 1. Doriešiť alebo výslovne akceptovať zostávajúce dev advisories, dokončiť
    kontajnerové kontroly, skontrolovať finálny diff
    a získať nový overený commit s aktuálnymi CI výsledkami vrátane PostgreSQL 16/18.
-2. Nezávisle overiť Lovable preview, publikovať overenú verziu a potvrdiť
-   produkčné API prepojenie aj prihlásenie/cookies v prehliadači a na iPhone.
-3. Obnoviť oprávnený Railway prístup; potvrdiť projekt `dev-new`, environment
-   `production`, služby, ich SHA/pin, Alembic head, worker a produkčný režim/HSTS.
+2. Doplniť overenie produkčného prihlásenia/cookies v prehliadači a na iPhone.
+   Publikovanie Lovable a verejné API prepojenie sú overené vyššie.
+3. Cez obnovený Railway dashboard prístup potvrdiť presné runtime SHA/pin,
+   Alembic head, worker a produkčný režim/HSTS; následne overiť nasadenie
+   aktuálnych backendových opráv. Stav CLI prihlásenia zostáva nevyriešený.
 4. Doložiť stav rotácie historicky kompromitovaných tajomstiev, čerstvú súkromnú
    zálohu a izolovaný restore, alerty a proxy/limiter trust boundary podľa
    [prevádzkového postupu](OPERATIONS_ACCEPTANCE.md) a
