@@ -46,6 +46,37 @@ async def test_logout(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("samesite", ["lax", "none"])
+async def test_secure_logout_expires_host_cookie(client: AsyncClient, test_user: User, monkeypatch, samesite):
+    from http.cookies import SimpleCookie
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "straz_cookie_secure", True)
+    monkeypatch.setattr(settings, "straz_cookie_samesite", samesite)
+    monkeypatch.setattr(settings, "straz_cookie_domain", ".example.com")
+    login = await client.post("/api/auth/login", json={
+        "email": test_user.email, "password": "SuperSecret123!",
+    })
+    assert login.status_code == 200
+    name = "__Host-" + settings.straz_cookie_name
+    cookie = f"{name}={login.cookies[name]}"
+    response = await client.post("/api/auth/logout", headers={"Cookie": cookie})
+    assert response.status_code == 204
+    expired = {}
+    for header in response.headers.get_list("set-cookie"):
+        expired.update(SimpleCookie(header))
+    host_cookie = expired[name]
+    # __Host- expiry headers must satisfy the same browser prefix rules as creation.
+    assert host_cookie["secure"]
+    assert host_cookie["path"] == "/" and not host_cookie["domain"]
+    assert host_cookie["max-age"] == "0" and host_cookie.value == ""
+    assert host_cookie["samesite"] == samesite
+    assert expired[settings.straz_cookie_name]["domain"] == ".example.com"
+    assert (await client.get("/api/auth/me", headers={"Cookie": cookie})).status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_change_password(auth_client: AsyncClient, test_user: User):
     # Change password
     resp = await auth_client.post(

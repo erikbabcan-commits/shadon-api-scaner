@@ -44,8 +44,17 @@ def _clear_auth_cookie(response: Response, settings: Settings) -> None:
         if settings.straz_cookie_secure
         else settings.straz_cookie_name
     )
-    response.delete_cookie(cookie_name, path="/", domain=None if settings.straz_cookie_secure else settings.straz_cookie_domain)
-    response.delete_cookie(settings.straz_cookie_name, path="/", domain=settings.straz_cookie_domain)
+    samesite = settings.straz_cookie_samesite.lower()
+    secure = settings.straz_cookie_secure or samesite == "none"
+    # Expiration is also a Set-Cookie operation: __Host- still requires Secure.
+    response.delete_cookie(
+        cookie_name, path="/", domain=None if settings.straz_cookie_secure else settings.straz_cookie_domain,
+        secure=secure, httponly=True, samesite=samesite,  # type: ignore[arg-type]
+    )
+    response.delete_cookie(
+        settings.straz_cookie_name, path="/", domain=settings.straz_cookie_domain,
+        secure=secure, httponly=True, samesite=samesite,  # type: ignore[arg-type]
+    )
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
