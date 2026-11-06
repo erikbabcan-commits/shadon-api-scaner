@@ -15,6 +15,7 @@ import scanner_git
 import scanner_httpx
 import scanner_naabu
 import scanner_tlsx
+import scanner_trivy
 from scanner_policy import compile_policy
 
 
@@ -42,14 +43,16 @@ def execute(job, images):
     if identity != job['job_id']:
         raise ValueError('Require canonical scanner job identity')
     profile = job.get('profile')
-    if profile not in ('tls', 'http', 'gitleaks', 'ports'):
+    if profile not in ('tls', 'http', 'gitleaks', 'ports', 'trivy_fs'):
         raise ValueError('Unsupported isolated profile')
-    repository = profile == 'gitleaks' and 'repository_url' in job
-    payload_field = ('repository_url' if repository else 'source_base64') if profile == 'gitleaks' else 'target'
+    repository = profile in ('gitleaks', 'trivy_fs') and 'repository_url' in job
+    if profile == 'trivy_fs' and not repository:
+        raise ValueError('Dependency job requires an authorized repository')
+    payload_field = ('repository_url' if repository else 'source_base64') if profile in ('gitleaks', 'trivy_fs') else 'target'
     expected = {'version', 'job_id', 'profile', payload_field}
     if set(job) != expected:
         raise ValueError('Unexpected scanner job fields')
-    keys = ('guard', 'git', 'gitleaks') if repository else ((profile,) if profile == 'gitleaks' else ('guard', profile))
+    keys = ('guard', 'git', profile) if repository else ((profile,) if profile == 'gitleaks' else ('guard', profile))
     if (not isinstance(images, dict) or any(not isinstance(images.get(key), str)
         or not re.fullmatch(r'sha256:[a-f0-9]{64}', images[key]) for key in keys)):
         raise ValueError('Missing approved immutable scanner image')
@@ -58,8 +61,12 @@ def execute(job, images):
         addresses = resolve_target(host, port)
         snapshot = scanner_git.clone_archive(images['guard'], images['git'],
                                              job['repository_url'], addresses[0])
-        result = {'scope': 'repository_head', 'commit': snapshot['commit'],
-                  'findings': scanner_gitleaks.scan_archive(images['gitleaks'], snapshot['archive'])}
+        if profile == 'gitleaks':
+            result = {'scope': 'repository_head', 'commit': snapshot['commit'],
+                      'findings': scanner_gitleaks.scan_archive(images[profile], snapshot['archive'])}
+        else:
+            result = scanner_trivy.scan_archive(images[profile], snapshot['archive'])
+            result['repository_commit'] = snapshot['commit']
     elif profile == 'gitleaks':
         encoded = job['source_base64']
         if not isinstance(encoded, str) or len(encoded) > 1398104:

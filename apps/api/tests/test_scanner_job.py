@@ -89,3 +89,18 @@ def test_ports_job_passes_only_explicit_ports(dispatcher, monkeypatch):
     images = {key: 'sha256:' + 'a' * 64 for key in ('guard', 'ports')}
     result = dispatcher.execute(envelope, images)
     assert result['observations_complete'] is True
+
+
+def test_dependency_job_retains_database_and_source_scope(dispatcher, monkeypatch):
+    envelope = {'version': 1, 'job_id': str(uuid.uuid4()), 'profile': 'trivy_fs',
+                'repository_url': 'https://authorized.example/repo.git'}
+    monkeypatch.setattr(dispatcher, 'resolve_target', lambda *args: ['1.1.1.1'])
+    monkeypatch.setattr(dispatcher.scanner_git, 'clone_archive', lambda *args:
+                        {'commit': 'a' * 40, 'archive': b'synthetic validated archive'})
+    monkeypatch.setattr(dispatcher.scanner_trivy, 'scan_archive', lambda *args:
+                        {'scope': 'supported_dependency_files', 'database': {'updated_at': 'fixture'}, 'findings': []})
+    images = {key: 'sha256:' + 'a' * 64 for key in ('guard', 'git', 'trivy_fs')}
+    result = dispatcher.execute(envelope, images)
+    assert result['result']['repository_commit'] == 'a' * 40
+    assert result['result']['scope'] == 'supported_dependency_files'
+    assert 'database' in result['result']

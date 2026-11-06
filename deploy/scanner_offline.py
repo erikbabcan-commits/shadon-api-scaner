@@ -11,7 +11,7 @@ from scanner_process import run_bounded
 
 
 def run_offline(image_id, argv, data=b'', *, timeout=30, max_output=4 * 1024 * 1024,
-                max_input=1024 * 1024):
+                max_input=1024 * 1024, memory_mib=128):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
         raise ValueError('Require an approved immutable local scanner image')
     if (not isinstance(argv, (list, tuple)) or not argv
@@ -22,6 +22,8 @@ def run_offline(image_id, argv, data=b'', *, timeout=30, max_output=4 * 1024 * 1
         raise ValueError('Invalid approved scanner input limit')
     if not isinstance(data, bytes) or len(data) > max_input:
         raise ValueError('Scanner input exceeds limit')
+    if type(memory_mib) is not int or memory_mib not in (128, 256):
+        raise ValueError('Invalid approved scanner memory limit')
     docker('image', 'inspect', image_id)
     job = uuid.uuid4().hex
     try:
@@ -29,7 +31,7 @@ def run_offline(image_id, argv, data=b'', *, timeout=30, max_output=4 * 1024 * 1
             '--name', 'straz-offline-' + job, '--label', 'straz.offline=' + job,
             '--network', 'none', '--read-only', '--user', '10001:10001',
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-            '--memory', '128m', '--memory-swap', '128m', '--cpus', '0.5',
+            '--memory', f'{memory_mib}m', '--memory-swap', f'{memory_mib}m', '--cpus', '0.5',
             '--pids-limit', '32', '--ipc', 'none', '--log-driver', 'none',
             '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=16m',
             '--entrypoint', argv[0], image_id, *argv[1:]], data,

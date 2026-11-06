@@ -1,0 +1,37 @@
+{
+  "verified_at": "2026-11-06T12:14:44.307344+00:00",
+  "tool": "trivy 0.74.0",
+  "release_sha256": "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a",
+  "image": "sha256:113b1c51d8ae0b399c7ed02c59e6aef45ac0de3f4deddd99fb90aac1cc6536b7",
+  "database": {
+    "updated_at": "2026-11-06T09:50:00.021603+00:00",
+    "next_update": "2026-11-07T09:50:00.021602+00:00"
+  },
+  "checks": {
+    "offline_synthetic_vulnerable_dependency_detected": true,
+    "real_repository_job": true,
+    "receipt_replay": true
+  },
+  "repository_snapshot": "ce12ee556b68b36d9232938b173c6cf09216ec67",
+  "analyzed_dependency_targets": 2,
+  "finding_count": 6,
+  "scope": "Supported dependency files of own public HEAD snapshot, not current release branch; real baked DB, network-none scan, no app activation or full package coverage claim",
+  "source_sha256": {
+    "deploy/scanner_namespace.py": "cb0312710ca62e1663063780072e0280f615accf2ff707f78e5fbcc13affbed9",
+    "deploy/scanner_process.py": "a09372943bd8727bdf67b92979f5d6b0a879b3077c08a139fcd76ce535830768",
+    "deploy/scanner_archive.py": "476c4e7d1deeed55781446e282438576bd1484bd7f58e02bfd5cffcd40d2bd48",
+    "deploy/scanner_network.py": "e898b0513e0f7a8418ac120468cece1bc6340f76a0ed08f3d2a6829a7384ad0a",
+    "deploy/scanner_job_cli.py": "a4bd7124149301ed686d5fa1f59505abcdb7a825e4a792a213619330dbb90423",
+    "deploy/scanner_naabu.py": "3b4efa4af3d6c571fab9b7e7f05be4618f654a6a2b66c1194554f4bcd6b717ca",
+    "deploy/scanner_httpx.py": "1436ab1f219d6f45c1bfdcdcf5ce5402a702306098de0f70a8ad26fd796e9a39",
+    "deploy/scanner_policy.py": "25940404d04d20d4d094afaa035cabd1f2575ada6c9b706889baacd047ed71c2",
+    "deploy/scanner_guard.py": "506d1437022b01307d80973f148e5c2169bcdc99bcc758be78d209175979b6ab",
+    "deploy/scanner_git.py": "aab525913124ba301ff79712f87efa03e1f128dcbbdb25660c331b86f6eca3b5",
+    "deploy/scanner_gitleaks.py": "6f8269e9e53e302c94e502291453c72daa13102abe584edbbdbf68183986a5d4",
+    "deploy/scanner_trivy.py": "281cfc0e1859bee96d7ab80c5923dd1940eae2e31414bf1044c1e3c19e937c5f",
+    "deploy/scanner_state.py": "06736a473d0595b33f738bbbaddf45045cec065dca45c3ad9d35ba3a268698be",
+    "deploy/scanner_offline.py": "a75a6dd057877d7e735674b37a107bf7fef5785edcf85242aa3ec5f150dd49e3",
+    "deploy/scanner_job.py": "7f5a4a8c977c6722f273785bc740b15759d5f79cadd7724901cfdc7832485ab3",
+    "deploy/scanner_tlsx.py": "baa00d27ea42dc434cd2a790a25dae99e016c998915437c22802e0b3ae74004a"
+  }
+}

@@ -1,5 +1,20 @@
 # Sieťová fixture pre budúci scanner runner
 
+`trivy_fs` teraz používa kontrolovaný Git HEAD archív a nový offline Trivy
+0.74.0 kontajner s vopred zabudovanou reálnou Aqua vulnerability DB. Runtime
+má network none, explicitný schválený YAML config, vypnuté repo ignore pravidlá,
+memory scan cache a 256 MiB limit. DB schema musí byť 2; UpdatedAt nesmie byť
+staršie než 72 h ani v budúcnosti o viac než 5 min, NextUpdate nesmie byť staršie
+než 24 h. Chýbajúci/neplatný DB alebo report bez analyzovaných targetov zlyhá.
+Scope je `supported_dependency_files`, nie úplná bezpečnosť či všetky balíky.
+Výsledok nesie DB dátumy a zdrojový commit, CVE/balík/verzie/závažnosť.
+Reálny test zachytil syntetickú zraniteľnú lodash závislosť; vlastný verejný
+repo snapshot analyzoval 2 targety a vrátil 6 nálezov, vrátane dnspython 2.8.0.
+Tieto nálezy neznamenajú, že aktuálna release vetva má rovnaké npm verzie.
+[Dôkaz a presná identita](evidence/scanner-trivy-fs-live-2026-11-06.json).
+DB refresh/reprodukovateľný build, širšia jazyková coverage a produkčná
+aktivácia zostávajú otvorené. Skener počas jobu nič nesťahuje.
+
 TCP connect profil `deploy/scanner_naabu.py` používa Naabu 2.6.1 výhradne
 v režime `-s c`, non-root, bez capabilities a host discovery. Povolených je
 1..64 explicitných portov; nft allowlist obsahuje presné IP/port páry.
