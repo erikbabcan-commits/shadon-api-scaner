@@ -36,7 +36,13 @@ sám nečistí. Pred testom mal VPS približne 117 MiB: používateľ schválil 
 kvôli závislostiam. Image a volumes aj bežiace služby zostali zachované.
 [Dôkaz schváleného čistenia](evidence/vps-approved-cache-cleanup-2026-11-06.json).
 Po nových buildoch zostalo približne 479 MiB, čo je prevádzkový nedostatok;
-upratanie šiestich nových upload kontextov čaká na samostatné schválenie.
+Po samostatnom výslovnom schválení sa odstránilo aj všetkých šesť nových
+upload kontextov. Voľné miesto stúplo na 696 479 744 bajtov (približne 664 MiB);
+14 kontajnerov, image a volumes zostalo zachovaných.
+[Dôkaz](evidence/scanner-context-cleanup-2026-11-06.json).
+Jednorazový read-only kapacitný gate pred týmto čistením potvrdil critical;
+aj nový voľný priestor je pod critical hranicou približne 1,86 GiB.
+[Dôkaz kontroly](evidence/scanner-storage-live-2026-11-06.json).
 Tento krok neaktivuje aplikačné CLI profily a nedokazuje bezpečnosť všetkých
 závislostí nástrojov. Reprodukovateľný Git/Naabu/Trivy build, DB refresh,
 kapacitný monitoring a ďalšie integračné hranice zostávajú otvorené.

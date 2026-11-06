@@ -65,8 +65,10 @@ zraniteľností, OS balíkov kontajnera alebo produkčného runtime.
 - Na VPS sa po schválení odstránilo 38 zo 45 konkrétnych neaktívnych,
   nesdieľaných cache záznamov; závislosti siedmich sa nevynucovali. Všetkých
   14 pôvodných kontajnerov, image a volumes zostalo zachovaných. Po ďalších
-  buildoch je voľné miesto opäť nízke; čistenie šiestich nových kontextov čaká
-  na nový súhlas. Trvalá kapacitná politika a monitoring sú stále otvorené.
+  buildoch bolo voľné miesto opäť nízke. Po novom výslovnom súhlase sa
+  odstránilo všetkých šesť nových kontextov: ostáva približne 664 MiB,
+  stále pod kritickou kapacitnou hranicou. Existujúce kontajnery/image/volumes
+  sa zachovali. [Nový dôkaz](evidence/scanner-context-cleanup-2026-11-06.json). Trvalá kapacitná politika a monitoring sú stále otvorené.
   [Dôkaz čistenia](evidence/vps-approved-cache-cleanup-2026-11-06.json).
 - Všetkých osem aplikačných CLI profilov zostáva zablokovaných. Ešte chýba
   autentifikovaný transport a queue/tenant admission integrácia, zvyšné adaptéry,

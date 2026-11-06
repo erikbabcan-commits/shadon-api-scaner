@@ -1,0 +1,15 @@
+{
+  "observed_at_utc": "2026-11-06T13:12:04.808556+00:00",
+  "host": "Selected existing ubuntu-2gb-hel1-1",
+  "checker_sha256": "ebd187d9dcc015e7adafc0a9d2d2ac33b62f4fb31cabe162a3b38d600f9c4b39",
+  "exit_code": 1,
+  "result": {
+    "status": "critical",
+    "total_bytes": 39956590592,
+    "free_bytes": 503062528,
+    "critical_floor_bytes": 1997829529,
+    "warning_floor_bytes": 3995659059,
+    "read_only": true
+  },
+  "scope": "One-shot read-only storage check over existing SSH. No monitoring installation, pruning, service restart, application deployment or secret access."
+}
