@@ -20,7 +20,7 @@ Verejné URL sú v NOTION_NOTES.md; interné DSN ani heslá do dokumentácie nep
 
 Root pre API/worker: apps/api. Dockerfile API: Dockerfile; worker: worker.Dockerfile.
 Migrácie vykonáva nový API image cez `python -m app.migrations upgrade`.
-Prechod 008 → 009 vyžaduje koordinované zastavenie starého API/workera a overenú
+Prechod 008 → 010 (cez 009) vyžaduje koordinované zastavenie starého API/workera a overenú
 zálohu podľa [cutover/rollback postupu](MIGRATION_008_009_CUTOVER.md); samotný
 automatický pre-deploy hook bez tejto koordinácie nestačí. Štart a health definujú
 apps/api/railway.api.json a railway.worker.json. Ak platforma pre nový projekt vyžaduje

@@ -19,7 +19,7 @@ Produkčná rotácia, reštarty a deploy vyžadujú výslovné schválenie použ
   source pin `8540cde` sa líši od runtime aj od release kandidáta. Žiadny z nich
   sa automaticky nepovažuje za aktuálny schválený deployment.
 - Automatické zálohy, vzdialená retencia, obnova po výpadku celého počítača,
-  doručené alerty, rotácia tajomstiev a produkčný upgrade 009 zostávajú otvorené.
+  doručené alerty, rotácia tajomstiev a produkčný upgrade 010 zostávajú otvorené.
   Lokálne súkromné zálohy nenahrádzajú off-site zálohu mimo tohto počítača.
 
 ## Read-only DB kontrola a osirelé aplikácie
@@ -38,7 +38,7 @@ Toto PR nepridáva backfill, novú schému ani produkčný dátový zápis.
 
 ## Záloha a izolovaný restore
 
-Koordináciu API/workera pri zmene head 008 → 009 a návrat cez novú databázu opisuje
+Koordináciu API/workera pri zmene head 008 → 010 cez 009 a návrat cez novú databázu opisuje
 [cutover/rollback postup](MIGRATION_008_009_CUTOVER.md). Reálna manuálna skúška
 je doložená vyššie; nasledujúci postup treba zopakovať pri finálnom cutover a
 previesť na schválenú automatickú retenčnú politiku.
@@ -70,6 +70,11 @@ Pridať súkromný monitoring worker heartbeat/job latency/queue backlog a backu
 Príjemcu a kanál musí určiť vlastník; bez neho sa neposiela syntetická notifikácia.
 Otestovať alert na stagingovej sonde, nie vypnutím produkčnej DB alebo Redisu.
 Aktuálne nastavenie, doručenie, retencia logov a RPO/RTO **neboli týmto PR potvrdené**.
+
+Kandidát má [obnoviteľný outbox a plánovanie](SCHEDULING_AND_NOTIFICATIONS.md),
+vrátane reálneho lokálneho TLS receipt testu. Produkcia ich ešte nepoužíva.
+Po cutover overiť aj vek pending/processing udalostí, počet pokusov a terminálne
+failed udalosti; samotný zdravý ARQ proces nepotvrdzuje doručenie správ.
 
 ## Zdroj deploya a zodpovednosť
 

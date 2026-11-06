@@ -6,7 +6,42 @@ testy, historické CI a hlásenie Lovable sú odlišné dôkazy. Lovable fronten
 publikovaný a verejné API prepojenie je overené; nové backendové opravy zatiaľ
 nie sú potvrdené produkčným deploymentom.
 
-## Nové opravy a ich overenie
+## Aktuálny backendový kandidát 8c78029
+
+Kandidát očakáva schému **010_alert_outbox_leases**. Produkčné nasadenie ani
+rotácia sa nevykonali. Staršie výsledky nižšie patria svojim uvedeným commitom.
+
+- **255 passed, 0 skipped** na PostgreSQL 16.15 aj 18.6, Python 3.12.13 a vždy
+  samostatný Redis. Súbory sa počas finálneho behu nemenili; runner to kontroluje
+  hashmi pred aj po testovaní. Rozsah je SQLite API + reálne PG migrácie/locking
+  + Redis + lokálny TLS receiver, nie všetky API testy na PostgreSQL.
+  [Finálna matica](evidence/backend-recovery-matrix-2026-11-06.json).
+- Nové plánovanie rešpektuje efektívny plán, UTC okná, kvótu a aktívne profily.
+  Free nečerpá kvótu automatickým heartbeat. PG org lock a auditovaný durable
+  admission bránia duplicitnému scheduler admission; nejde o globálny mutex
+  pre manuálne skeny. [Presný kontrakt](SCHEDULING_AND_NOTIFICATIONS.md).
+- Outbox má fenced lease, najviac 5 pokusov a obnovu po páde. Skutočný lokálny
+  HTTPS test dokázal 503 → retry → 200 pri overovanom TLS, HMAC a stabilnom ID.
+  Nepotvrdzuje doručenie produkčnému príjemcovi ani exactly-once záruku.
+- Reálna produkčná záloha bola znovu obnovená do izolovaného Unix-only PG18
+  a posunutá 008 → 010. Zachované pôvodné dáta 15 aplikačných tabuliek a audit;
+  pracovná kópia bola odstránená, archív zostal súkromný a produkcia sa nemenila.
+  [Dôkaz](evidence/production-restore-010-2026-11-06.json).
+- Ruff 0.17.4 F/E9 prešiel, Mypy 2.4.1 prešiel 50 zdrojových súborov v predvolenom
+  režime (nie strict). API/worker/legacy frontend image boli zostavené pre AMD64
+  z čistého exportu kandidáta. [Buildy](evidence/container-builds-recovery-2026-11-06.json),
+  [statické a lokálne kontroly](evidence/recovery-quality-checks-2026-11-06.json).
+- Finálne kontajnerové overenie prešlo **34/34**: reálna DB/Redis/ARQ cesta,
+  automatický scheduler run a deduplikácia opakovaného ticku, session/API-key
+  hranice a startup odmietnutia 008/009/010 medzi novými a historickými image.
+  Vlastné kontajnery a sieť boli odstránené. Syntetické dáta a lokálny platený
+  fixture nie sú produkčný deployment ani reálna platba.
+  [Dôkaz](evidence/container-runtime-recovery-2026-11-06.json).
+- Child procesy majú spoločný limit výstupu 4 MiB a POSIX group cleanup pri
+  timeout/cancel; 17 reálnych procesných regresií. To nenahrádza sieťovú a
+  filesystem izoláciu ôsmich CLI profilov, ktoré zostávajú zablokované.
+
+## Predchádzajúce opravy a ich overenie
 
 - `f806cb6`: výpadok InternetDB, neplatná/čiastočná odpoveď alebo DNS chyba už
   nepredstierajú úspešný sken a neuzavrú staré high nálezy. Regresie vykonávajú
@@ -333,7 +368,7 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
    Publikovanie, opravený Lovable náhľad, produkčné rozhranie a verejné API
    prepojenie sú overené vyššie. Lokálny HTTP login nie je produkčný login.
 3. Overiť ingress trust boundary,
-   HSTS a bezpečný upgrade potvrdenej revízie 008 na aktuálny head 009;
+   HSTS a bezpečný upgrade potvrdenej revízie 008 na aktuálny head 010;
    následne overiť nasadenie aktuálnych backendových opráv a nový povolený worker beh.
    CLI aj read-only kontrola starého produkčného workera už fungujú.
 4. Vykonať schválenú rotáciu historicky kompromitovaných tajomstiev, nastaviť
@@ -347,10 +382,10 @@ POST/PUT/PATCH/DELETE kontroly boli výhradne požiadavky odmietnuté proxy.
    Dovtedy musia zostať zablokované; zelené testy odmietania nie sú splnením ich
    funkčnosti. Potrebný je oddelený runner bez DB/Redis credentials, obmedzený
    filesystem/zdroje/výstup a vynútená sieťová politika; samotný Python DNS preflight nestačí.
-6. Doriešiť implementáciu obchodne deklarovaného daily/hourly plánovania
-   (aktuálny worker používa globálny heartbeat/weekly cron) a obnovu notification
-   outbox udalostí po páde v stave processing. Potvrdiť reálne doručenie na určený
-   testovací kanál po autorizácii; nepredstierať funkčnosť iba mockovaným testom.
+6. Nasadiť a prevádzkovo overiť nové plan-aware plánovanie a obnoviteľný notification
+   outbox. Doplniť globálny execution mutex/fencing a bezpečnú obnovu running skenov
+   po páde; scheduler admission lock túto odlišnú hranicu nerieši. Potvrdiť reálne
+   doručenie na určený testovací kanál po autorizácii; lokálny TLS fixture ho nenahrádza.
 
 Finálny release záznam doplniť skutočnými nasadenými SHA, časom deploymentu,
 výsledkami aktuálnych kontrol a presným zoznamom zostávajúcich obmedzení.

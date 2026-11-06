@@ -1,14 +1,15 @@
-# STRÁŽ — koordinovaný prechod databázy 008 → 009
+# STRÁŽ — koordinovaný prechod databázy 008 → 010
 
 Toto je postup pre release operátora, nie záznam vykonaného produkčného upgrade.
 Posledný používateľom doložený Railway runtime má API commit `83a25c3`, PostgreSQL
 18.6 a revíziu `008_postgres_uuid_and_audit_fk`. Kandidát v PR #6 očakáva
-`009_cvss_and_poc_fields`. Pred zásahom treba znovu overiť runtime API aj workera.
+`010_alert_outbox_leases` (prechádza cez 009). Pred zásahom treba znovu overiť runtime
+API aj workera. Názov tohto súboru ostáva kvôli existujúcim odkazom.
 
 ## Hranica kompatibility
 
 API pri štarte vyžaduje presný Alembic head svojho image. Starý image s head 008
-po upgrade databázy na 009 nenabehne. Nový image s head 009 nenabehne na 008.
+po upgrade databázy na 009/010 nenabehne. Nový image s head 010 nenabehne na 008/009.
 Nespoliehať sa na to, že už bežiaci starý proces po zmene schémy ešte odpovedá.
 API a worker sa nasadzujú ako koordinovaná dvojica na rovnaký release commit.
 
@@ -16,6 +17,13 @@ Migrácia 009 pridáva štyri nullable stĺpce nálezov: `cvss_score`, `cvss_vec
 `poc_command`, `remediation_patch`. Jej downgrade tieto stĺpce **odstráni aj s dátami**.
 Príkaz `alembic downgrade 008_postgres_uuid_and_audit_fk` preto nie je automatický
 produkčný rollback.
+
+Migrácia 010 pridáva vlastníctvo doručenia (`lease_token`, `lease_expires_at`),
+počet pokusov (`attempt_count`) a čas ďalšieho pokusu (`next_attempt_at`) do
+alert_events. Existujúce sent/failed udalosti sa nesmú automaticky znovu doručovať.
+Downgrade odstráni informácie o pokusoch a vlastníctve; pred návratom treba zastaviť
+všetky notification workery a uchovať aktuálny stav. Záloha 008 nesie pôvodné dáta,
+nie dôkaz, že už rozpracované externé doručenie prebehlo presne raz.
 
 ## Predpoklady
 
@@ -42,8 +50,8 @@ produkčný rollback.
 2. Na izolovanom cieli obnoviť skúšobnú zálohu 008 a overiť revíziu, počty,
    vzťahy a auditné ochrany. Nespúšťať notifikácie, platby ani skeny z obnovenej kópie.
 3. Novým kandidátskym API image vykonať na tejto kópii `python -m app.migrations upgrade`.
-   Overiť revíziu 009, štart API a zhodu modelu. Starý Railway image obsahuje iba
-   svoj head; jeho `upgrade head` nemusí vedieť migrovať na 009.
+   Overiť revíziu 010, štart API a zhodu modelu. Starý Railway image obsahuje iba
+   svoj head; jeho `upgrade head` nevie migrovať na 009/010, ktoré neobsahuje.
 4. V servisnom okne zastaviť nové zápisy a riadene odstaviť pôvodný worker/API.
    Vytvoriť finálnu zálohu. Finálny import robiť do ďalšej novej databázy, nie
    prepisovať produkčný zdroj ani používanú skúšobnú kópiu. Zopakovať kontroly a upgrade.
@@ -69,9 +77,9 @@ Advisory lock migrácie serializuje migrátorov, ale nezastavuje staré aplikač
   na 008. Je to test konkrétnej migrácie, nie záruka pre ľubovoľný incident.
 - Ak ostala konzistentná 008 a nevznikli nové zápisy, možno obnoviť pôvodnú dvojicu
   image po overení jej kompatibility. Neopakovať migráciu naslepo.
-- Ak je databáza na 009, preferovať opravu nového release so zachovaním 009.
-  Staré API s head 008 proti nej nereštartovať.
-- Ak je nutný návrat na starý release, uchovať aj aktuálny stav 009 a obnoviť
+- Ak je databáza na 009/010, preferovať opravu nového release so zachovaním dát.
+  Staré API s head 008 ani 009 proti 010 nereštartovať.
+- Ak je nutný návrat na starý release, uchovať aj aktuálny stav 009/010 a obnoviť
   prechodovú zálohu 008 do **novej izolovanej databázy**. Overiť ju s kompatibilným
   starým image a až potom koordinovane prepnúť API aj worker. Rozdiely od zálohy
   musia byť vyhodnotené; nesmú sa potichu zahodiť nové nálezy alebo účty.
@@ -80,6 +88,10 @@ Advisory lock migrácie serializuje migrátorov, ale nezastavuje staré aplikač
   súčasťou DB zálohy. Bootstrap premenná sama existujúce heslo účtu nemení.
 
 ## Rozsah vykonanej skúšky
+
+Staršie dôkazy nižšie sú explicitne pre 008/009 a staršie image; nepotvrdzujú nový
+head 010. Nový cutover potrebuje nový test migrácie 009 → 010, obnovu produkčnej
+kópie až na 010 a nové API/worker image s rovnakým presným SHA.
 
 `tests/test_pg_cutover_009.py` používa výhradne loopback testovací server a vytvára
 vlastnú náhodne pomenovanú databázu, ktorú v `finally` odstráni. Testovací DB účet
