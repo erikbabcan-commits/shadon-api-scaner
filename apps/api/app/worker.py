@@ -29,7 +29,7 @@ from app.routers.findings import _invalidate_overview_cache
 
 logger = logging.getLogger("straz.worker")
 from app.services.findings import make_fingerprint, mark_absent_fixed, upsert_finding
-from app.services.internetdb import fetch_internetdb, resolve_public_ips
+from app.services.internetdb import fetch_internetdb
 from app.services.notifications import dispatch_alert, process_alert_outbox
 from app.services.scanners import (
     git_clone,
@@ -315,9 +315,9 @@ async def _internetdb(db, app: App, targets, redis) -> None:
     settings = get_settings()
     seen: set[str] = set()
     for target in targets:
-        ips = resolve_public_ips(target.host)
-        if not ips:
-            continue
+        # A failed or non-public DNS lookup is incomplete coverage, not an
+        # empty observation that may close existing vulnerability findings.
+        ips = await resolve_public_addresses(extract_hostname(target.host), 443)
         for ip in ips:
             for item in await fetch_internetdb(ip, settings=settings, redis=redis):
                 fp = make_fingerprint(item.fingerprint_key)
