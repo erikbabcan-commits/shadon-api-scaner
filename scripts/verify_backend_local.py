@@ -35,7 +35,7 @@ def free_port():
 
 
 def private_write(path, value):
-    with path.open("w", encoding="utf-8", opener=lambda name, flags: os.open(name, flags, 0o600)) as output:
+    with open(path, "w", encoding="utf-8", opener=lambda name, flags: os.open(name, flags, 0o600)) as output:
         output.write(value)
 
 
