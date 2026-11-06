@@ -1,5 +1,17 @@
 # Sieťová fixture pre budúci scanner runner
 
+Jednorazové rozhranie supervisora:
+`python3 deploy/scanner_job_cli.py --images-file <operátorom-spravované-images.json>`.
+Prijme jeden JSON zo stdin (max 2 MiB), odmietne duplicitné polia a vypíše
+jeden JSON do stdout. Konfigurácia obsahuje iba nemenné lokálne image IDs.
+Chyba vracia generický `scanner_job_failed`, nie tool stderr alebo zdrojové
+dáta. Pracovný alarm je 300 s; cleanup môže pokračovať po tomto limite.
+Bežné SIGTERM/INT/HUP rozbalia finally bloky, SIGKILL/crash recovery tým
+nie sú vyriešené. Reálny nový subprocess → izolovaný kontajner prešiel.
+[Dôkaz](evidence/scanner-cli-live-2026-11-06.json).
+CLI neotvára port. Autentifikovaný súkromný transport, admission a idempotencia
+musí vzniknúť pred jeho produkčným zapojením; žiadny daemon nebol nasadený.
+
 `deploy/scanner_job.py` poskytuje verzované dôveryhodné job rozhranie pre
 Gitleaks stdin, TLS a obmedzené HTTP pozorovanie. Identita je kanonické UUID,
 job nesmie vyberať príkaz, image ani env. Images sú pevná konfigurácia operátora.
