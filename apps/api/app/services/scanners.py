@@ -678,6 +678,8 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
             )
         ]
     report = path.parent / "gitleaks-report.json"
+    # A previous interrupted attempt must never supply this run's results.
+    report.unlink(missing_ok=True)
     code, _out, err = await _run_cmd(
         [
             binary,
@@ -695,20 +697,15 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
     )
     findings: list[ToolFinding] = []
     if not report.exists():
-        if code not in (0, 1):
-            findings.append(
-                ToolFinding(
-                    title="gitleaks failed",
-                    detail=err[:500] if err else f"exit {code}",
-                    severity="low",
-                    fingerprint_key="gitleaks-fail",
-                )
-            )
-        return findings
+        raise RuntimeError("Gitleaks did not produce complete results")
 
     try:
-        data = json.loads(report.read_text(encoding="utf-8", errors="replace"))
-    except json.JSONDecodeError:
+        with report.open('rb') as stream:
+            raw = stream.read(SCANNER_OUTPUT_LIMIT_BYTES + 1)
+        if len(raw) > SCANNER_OUTPUT_LIMIT_BYTES:
+            raise RuntimeError("Gitleaks report exceeds limit")
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
         raise RuntimeError("Malformed Gitleaks results") from None
     finally:
         try:
@@ -716,13 +713,19 @@ async def run_gitleaks(path: Path) -> list[ToolFinding]:
         except OSError:
             pass
 
-    if not isinstance(data, list):
+    if (not isinstance(data, list) or code not in (0, 1)
+        or (code == 0) != (len(data) == 0)):
         raise RuntimeError("Incomplete Gitleaks results")
 
     for item in data:
-        rule = item.get("RuleID") or item.get("Description") or "secret"
-        file_path = item.get("File") or item.get("Path") or ""
-        start = item.get("StartLine") or item.get("Line") or 0
+        if (not isinstance(item, dict)
+            or not isinstance(item.get('RuleID'), str) or not item['RuleID']
+            or not isinstance(item.get('File'), str)
+            or type(item.get('StartLine')) is not int or item['StartLine'] < 1):
+            raise RuntimeError("Incomplete Gitleaks finding")
+        rule = item['RuleID']
+        file_path = item['File']
+        start = item['StartLine']
         # Never store raw secret — redact
         findings.append(
             ToolFinding(
