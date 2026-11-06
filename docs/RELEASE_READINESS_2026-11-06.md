@@ -36,12 +36,12 @@ dependency targety bez nálezov v danej DB; nejde o dôkaz neprítomnosti všetk
 zraniteľností, OS balíkov kontajnera alebo produkčného runtime.
 [Dôkaz a hashe lockfiles](evidence/release-dependency-scan-2026-11-06.json).
 
-## Aktuálne natívne overenie 7bfc00f a samostatný supervisor
+## Aktuálne natívne overenie 43ff84f a samostatný supervisor
 
-- **452 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
+- **454 passed, 0 skipped** nezávisle pri PostgreSQL 16.15 aj 18.6,
   Python 3.12.13 a vlastnom Redis. Testovaný strom bol čistý; fingerprint teraz
   zahŕňa aj supervisor moduly a scanner verifikačné/build skripty.
-  [Dôkaz a presné hashe](evidence/backend-storage-gate-matrix-2026-11-06.json).
+  [Dôkaz a presné hashe](evidence/backend-receipt-capacity-matrix-2026-11-06.json).
   Rozsah zostáva SQLite API units + reálne PG/Redis/TLS/procesné/Git fixtures,
   nie všetky API scenáre na PostgreSQL.
 - Nových päť regresií overuje rollback čiastočných pozorovaní pri zrušení,
