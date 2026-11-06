@@ -163,6 +163,24 @@ export type Overview = {
   running_scans: number;
 };
 
+export type AppCompliance = {
+  app_id: string;
+  scoring: {
+    // Older servers return grades without verified coverage. Never use them as
+    // a security or compliance conclusion in the UI.
+    score?: number | null;
+    grade?: string | null;
+    open_counts: { total: number };
+  };
+  nis2_readiness: Array<{
+    id: string;
+    name: string;
+    iso_ref: string;
+    issues_count: number;
+    status: string;
+  }>;
+};
+
 const envApiUrl = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 // In browser environments on Vercel, prefer relative paths ("")
 // to leverage reverse proxy rewrites and ensure first-party cookie compatibility across iOS Safari / WebKit.
@@ -276,7 +294,7 @@ export const api = {
       body: JSON.stringify({ return_url: returnUrl }),
     }),
   getAppCompliance: (appId: string) =>
-    request<any>(`/api/apps/${appId}/compliance`),
+    request<AppCompliance>(`/api/apps/${appId}/compliance`),
   getBranding: (orgId: string) =>
     request<{
       custom_logo_url: string | null;
